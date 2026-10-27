@@ -797,6 +797,30 @@
       for (var i = 0; i < 26; i++) ui.ambient.push({ x: Math.random(), y: Math.random(), s: 0.5 + Math.random(), p: Math.random() * TAU });
     }
 
+    /* ---- audio (optional; see audio.js) ---- */
+    var audio = window.CornfieldAudio;
+    function sound(name) { if (audio && audio[name]) audio[name](); }
+    function syncAudioButtons() {
+      if (!audio) return;
+      [['btn-music', 'Music', audio.music()], ['btn-sfx', 'Sounds', audio.sfx()]].forEach(function (b) {
+        var el = $(b[0]);
+        el.setAttribute('aria-pressed', b[2] ? 'true' : 'false');
+        el.textContent = b[1] + ': ' + (b[2] ? 'On' : 'Off');
+      });
+    }
+    function wireAudio() {
+      if (!audio || !audio.supported) {
+        $('btn-music').disabled = true; $('btn-sfx').disabled = true;
+        $('audio-note').hidden = false;
+        return;
+      }
+      $('btn-music').addEventListener('click', function () { audio.setMusic(!audio.music()); });
+      $('btn-sfx').addEventListener('click', function () { audio.setSfx(!audio.sfx()); });
+      audio.onChange(syncAudioButtons);
+      syncAudioButtons();
+    }
+    wireAudio();
+
     /* ---- actions ---- */
     function startTimer() {
       if (ui.running || S.run.won) return;
@@ -813,6 +837,7 @@
       $('win-text').textContent = 'Your ' + S.animal + ' made it through "' + S.name + '".';
       $('win').hidden = false; ui.winShown = true;
       burst(S.exit.x, S.exit.y, 'confetti', 60);
+      sound('victory');
       say('Your ' + S.animal + ' reached the flag in ' + fmt(ui.elapsed) + '!');
       setTimeout(function () { var b2 = $('win-again'); if (b2 && !$('win').hidden) b2.focus(); }, 50);
     }
@@ -823,14 +848,14 @@
         clearTimeout(ui.strokeTimer);
         ui.strokeTimer = setTimeout(function () { core.endStroke(S); }, 450);
         var r = core.moveTractor(S, dx, dy);
-        if (r.carved) { burst(r.x, r.y, 'chaff', 5); changed(); }
+        if (r.carved) { burst(r.x, r.y, 'chaff', 5); changed(); sound('carve'); }
         else if (!r.moved) say('That is the edge of the field.');
       } else {
         var m = core.moveRunner(S, dx, dy);
         if (m.moved) {
           startTimer(); ui.hint = null;
-          if (m.won) victory();
-        } else if (m.blocked) { ui.bump = 0.25; }
+          if (m.won) victory(); else sound('step');
+        } else if (m.blocked) { ui.bump = 0.25; sound('bump'); }
       }
     }
     function setMode(m) {
@@ -1026,10 +1051,13 @@
       if (!ui.pointer.engaged) { if (dist <= (ui.pointer.fresh ? 3 : 2)) ui.pointer.engaged = true; else return; }
       if (ui.mode === 'carve') {
         var r = core.carveTo(S, p.x, p.y, 12);
-        if (r.carved) { burst(S.tractor.x, S.tractor.y, 'chaff', 4); changed(); }
+        if (r.carved) { burst(S.tractor.x, S.tractor.y, 'chaff', 4); changed(); sound('carve'); }
       } else {
         var before = S.run.moves, n = core.runTo(S, p.x, p.y, 6);
-        if (n) { startTimer(); ui.hint = null; if (S.run.won && S.run.moves !== before) victory(); }
+        if (n) {
+          startTimer(); ui.hint = null;
+          if (S.run.won && S.run.moves !== before) victory(); else sound('step');
+        }
       }
     }
     canvas.addEventListener('pointerdown', function (e) {
