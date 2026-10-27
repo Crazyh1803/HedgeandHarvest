@@ -23,7 +23,7 @@
   function save() { try { root.localStorage.setItem(KEY, JSON.stringify(prefs)); } catch (e) { /* ignore */ } }
   function notify() { for (var i = 0; i < listeners.length; i++) { try { listeners[i](); } catch (e) { /* ignore */ } } }
 
-  var BPM = 66, SPB = 60 / BPM;
+  var BPM = 86, SPB = 60 / BPM;
   // Original gentle loop: four chords, two beats of pulse per half-bar.
   var CHORDS = [
     { pad: [87.31, 130.81, 164.81], notes: [261.63, 329.63, 392.0, 440.0, 523.25] },   // F  / C E G A C
