@@ -1,7 +1,9 @@
 const assert = require('node:assert/strict');
 const { pathToFileURL } = require('node:url');
 const path = require('node:path');
-const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+let chromium;
+try { ({ chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright')); }
+catch { throw new Error('Browser checks require Playwright. Install it or set PLAYWRIGHT_MODULE to its module directory; see README.md.'); }
 require('node:fs').mkdirSync('.ai/previews', { recursive: true });
 
 (async () => {
@@ -41,6 +43,7 @@ require('node:fs').mkdirSync('.ai/previews', { recursive: true });
     await page.keyboard.press('Enter');
     for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowRight');
     await page.locator('#btn-place-exit').click();
+    const expectedExit = await page.evaluate(() => ({ x: window.__cornfield.state().tractor.x, y: window.__cornfield.state().tractor.y }));
     const target = await page.evaluate(() => {
       const v = window.__cornfield.view(), t = window.__cornfield.state().tractor;
       return { x: v.gridX + (t.x + 0.5) * v.t, y: v.gridY + (t.y + 0.5) * v.t };
@@ -51,6 +54,7 @@ require('node:fs').mkdirSync('.ai/previews', { recursive: true });
       const s = window.__cornfield.state(); return { start: s.start, exit: s.exit, grid: Array.from(s.grid) };
     });
     assert.equal(gates.exit.x - gates.start.x, 3);
+    assert.deepEqual(gates.exit, expectedExit, 'pointer gate must land on the intended field cell');
     await page.locator('#btn-maze').click();
     await page.locator('#btn-maze').click();
     assert.deepEqual(await page.evaluate(() => {

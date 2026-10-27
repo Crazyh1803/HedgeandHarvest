@@ -1,7 +1,9 @@
 const assert = require('node:assert/strict');
 const { pathToFileURL } = require('node:url');
 const path = require('node:path');
-const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+let chromium;
+try { ({ chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright')); }
+catch { throw new Error('Browser checks require Playwright. Install it or set PLAYWRIGHT_MODULE to its module directory; see README.md.'); }
 const C = require('../game.js');
 
 (async () => {
@@ -10,13 +12,21 @@ const C = require('../game.js');
   try {
     const legacy = C.serialize(C.newMaze({ size: 'small', season: 'autumn', animal: 'cat', seed: 42, name: 'Legacy orchard' }));
     legacy.version = 1; delete legacy.purpose;
-    for (const [raw, valid] of [[JSON.stringify(legacy), true], ['{"format":"cornfield-carver","version":99}', false]]) {
+    const unreadable = '{"format":"cornfield-carver","version":99}';
+    for (const [raw, valid, failBackup] of [[JSON.stringify(legacy), true, false], [unreadable, false, false], [unreadable, false, true]]) {
       const context = await browser.newContext();
       const page = await context.newPage();
-      await page.addInitScript(value => {
-        localStorage.setItem('cornfield-carver:v1', value);
+      await page.addInitScript(({ raw, failBackup }) => {
+        localStorage.setItem('cornfield-carver:v1', raw);
         localStorage.setItem('cornfield-carver:seen', '1');
-      }, raw);
+        if (failBackup) {
+          const native = Storage.prototype.setItem;
+          Storage.prototype.setItem = function (key, value) {
+            if (key === 'cornfield-carver:backup') throw new DOMException('Quota full', 'QuotaExceededError');
+            return native.call(this, key, value);
+          };
+        }
+      }, { raw, failBackup });
       await page.goto(url);
       await page.waitForFunction(() => !!window.__cornfield);
       if (valid) {
@@ -30,8 +40,15 @@ const C = require('../game.js');
       } else {
         assert.equal(await page.evaluate(() => window.__cornfield.state().purpose), 'art');
         await page.waitForTimeout(600);
-        const backups = await page.evaluate(() => Object.keys(localStorage).filter(k => /backup/.test(k)).map(k => localStorage.getItem(k)));
-        assert.ok(backups.includes(raw), 'an unreadable existing save must survive as a raw backup');
+        if (failBackup) {
+          await page.locator('#creation-name').fill('New work during storage pressure');
+          await page.waitForTimeout(600);
+          assert.equal(await page.evaluate(() => localStorage.getItem('cornfield-carver:v1')), raw, 'failed backup must block later autosaves from overwriting the original');
+          assert.match(await page.locator('#save-status').innerText(), /Autosave paused/);
+        } else {
+          const backups = await page.evaluate(() => Object.keys(localStorage).filter(k => /backup/.test(k)).map(k => localStorage.getItem(k)));
+          assert.ok(backups.includes(raw), 'an unreadable existing save must survive as a raw backup');
+        }
       }
       await context.close();
     }

@@ -496,6 +496,9 @@
     g.quadraticCurveTo(mx + nx * wid, my + ny * wid, ex, ey);
     g.quadraticCurveTo(mx - nx * wid, my - ny * wid, x, y);
     g.fillStyle = c; g.fill();
+    var sheen = g.createLinearGradient(mx - nx * wid, my - ny * wid, mx + nx * wid, my + ny * wid);
+    sheen.addColorStop(0, 'rgba(20,40,10,0.26)'); sheen.addColorStop(0.4, 'rgba(255,255,215,0.22)'); sheen.addColorStop(1, 'rgba(20,40,10,0.32)');
+    g.fillStyle = sheen; g.fill();
     g.strokeStyle = rib; g.lineWidth = Math.max(0.6, wid * 0.22); g.lineCap = 'round';
     g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(mx, my, ex, ey); g.stroke();
   }
@@ -507,9 +510,9 @@
     // stalk
     var top = at(1);
     g.lineCap = 'round';
-    g.strokeStyle = mix(pal.stalk, -0.22); g.lineWidth = 0.085 * t * sc;
+    g.strokeStyle = mix(pal.stalk, -0.22); g.lineWidth = 0.095 * t * sc;
     g.beginPath(); g.moveTo(rx, ry); g.quadraticCurveTo(rx, ry - h * 0.55, top.x, top.y); g.stroke();
-    g.strokeStyle = pal.stalk; g.lineWidth = 0.055 * t * sc;
+    g.strokeStyle = pal.stalk; g.lineWidth = 0.065 * t * sc;
     g.beginPath(); g.moveTo(rx - 0.008 * t, ry); g.quadraticCurveTo(rx - 0.008 * t, ry - h * 0.55, top.x - 0.008 * t, top.y); g.stroke();
     // lower leaves, then the ear, then upper leaves in front
     var rib = mix(pal.leaf, 0.28), snow = season === 'winter';
@@ -517,14 +520,14 @@
       for (i = from; i < to; i++) {
         f = 0.16 + i * 0.15; side = i % 2 ? 1 : -1;
         var p = at(f), len = (0.62 - f * 0.28) * t * sc, ang = side > 0 ? -0.55 - rnd() * 0.2 : -Math.PI + 0.55 + rnd() * 0.2;
-        leaf(g, p.x, p.y, ang, len, 0.065 * t * sc, i % 3 === 0 ? mix(pal.leaf, -0.14) : pal.leaf, rib, 1.1 + rnd() * 0.5);
+        leaf(g, p.x, p.y, ang, len, 0.09 * t * sc, i % 3 === 0 ? mix(pal.leaf, -0.14) : pal.leaf, rib, 1.1 + rnd() * 0.5);
         if (snow) { g.fillStyle = 'rgba(255,255,255,0.85)'; g.beginPath(); g.ellipse(p.x + Math.cos(ang) * len * 0.7, p.y + Math.sin(ang) * len * 0.7 - 0.01 * t, 0.07 * t * sc, 0.025 * t * sc, 0, 0, TAU); g.fill(); }
       }
     }
     leaves(0, 3);
     // ear
     var es = rnd() < 0.5 ? -1 : 1, ep = at(0.5), er = (season === 'spring' ? 0.62 : 1) * sc;
-    var ex = ep.x + es * 0.085 * t * sc, ey = ep.y - 0.03 * t, ew = 0.075 * t * er, eh = 0.25 * t * er, tilt = es * 0.28;
+    var ex = ep.x + es * 0.085 * t * sc, ey = ep.y - 0.03 * t, ew = 0.095 * t * er, eh = 0.27 * t * er, tilt = es * 0.28;
     g.save(); g.translate(ex, ey); g.rotate(tilt);
     // husk leaves wrapping the base
     for (i = -1; i <= 1; i += 2) leaf(g, i * 0.015 * t, eh * 0.55, -Math.PI / 2 + i * 0.22, eh * 1.15, ew * 0.95, pal.husk, mix(pal.husk, -0.2), i * 0.1);
@@ -887,6 +890,7 @@
       try { var b = JSON.parse(load(BEST_KEY) || '{}'); return b && typeof b === 'object' ? b : {}; } catch (e) { return {}; }
     }
     function scheduleSave() {
+      if (ui.saveBlocked) { $('save-status').textContent = 'Autosave paused to preserve your earlier save. Export this field to keep it.'; return; }
       $('save-status').textContent = 'Saving...';
       clearTimeout(ui.saveTimer);
       ui.saveTimer = setTimeout(function () {
@@ -1464,7 +1468,10 @@
     if (res && res.ok) { st = res.state; st.dirty = true; }
     else {
       // A save we cannot read is copied aside before the new field's autosave replaces it.
-      if (saved && load(BACKUP_KEY) !== saved) backedUp = store(BACKUP_KEY, saved);
+      if (saved) {
+        backedUp = load(BACKUP_KEY) === saved || store(BACKUP_KEY, saved);
+        ui.saveBlocked = !backedUp;
+      }
       st = core.newBlank({ size: 'medium', season: 'summer', animal: 'dog', seed: randSeed(), name: DEFAULT_NAME });
     }
     S = st;

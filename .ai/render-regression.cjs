@@ -63,6 +63,7 @@ require('node:fs').mkdirSync('.ai/previews', { recursive: true });
       const a = await sample();
       assert.ok(a.view.layerW <= a.view.cw && a.view.layerH <= a.view.ch, 'overview must fit the complete tray');
       assert.ok(a.view.ox >= 0 && a.view.oy >= 0, 'overview tray must stay inside the canvas');
+      assert.ok(a.view.ox + a.view.layerW <= a.view.cw && a.view.oy + a.view.layerH <= a.view.ch, 'overview must fit right and bottom tray edges');
       await page.waitForTimeout(300);
       assert.deepEqual((await sample()).view, a.view, 'resize must settle without camera drift');
       assert.equal(await page.evaluate(() => window.__blankResizes), 0, 'real resize callback must redraw before yielding');
