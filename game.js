@@ -890,7 +890,7 @@
       try { var b = JSON.parse(load(BEST_KEY) || '{}'); return b && typeof b === 'object' ? b : {}; } catch (e) { return {}; }
     }
     function scheduleSave() {
-      if (ui.saveBlocked) { $('save-status').textContent = 'Autosave paused to preserve your earlier save. Export this field to keep it.'; return; }
+      if (ui.saveBlocked) { $('save-status').textContent = 'Autosave paused for this session to preserve your earlier save. Export this field to keep it.'; return; }
       $('save-status').textContent = 'Saving...';
       clearTimeout(ui.saveTimer);
       ui.saveTimer = setTimeout(function () {
