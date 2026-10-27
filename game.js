@@ -823,6 +823,7 @@
 
     /* ---- actions ---- */
     function startTimer() {
+      // Called after a move, including a first-step win, which should record about 0:00.
       if (ui.running) return;
       ui.startedAt = performance.now() - ui.elapsed; ui.running = true;
     }
