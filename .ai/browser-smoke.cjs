@@ -41,8 +41,11 @@ require('node:fs').mkdirSync('.ai/previews', { recursive: true });
     await page.keyboard.press('Enter');
     for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowRight');
     await page.locator('#btn-place-exit').click();
-    await page.locator('#field').focus();
-    await page.keyboard.press('Enter');
+    const target = await page.evaluate(() => {
+      const v = window.__cornfield.view(), t = window.__cornfield.state().tractor;
+      return { x: v.gridX + (t.x + 0.5) * v.t, y: v.gridY + (t.y + 0.5) * v.t };
+    });
+    await page.locator('#field').click({ position: target });
     assert.equal(await page.locator('#mode-run').isEnabled(), true);
     const gates = await page.evaluate(() => {
       const s = window.__cornfield.state(); return { start: s.start, exit: s.exit, grid: Array.from(s.grid) };

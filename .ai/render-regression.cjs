@@ -61,11 +61,19 @@ require('node:fs').mkdirSync('.ai/previews', { recursive: true });
       assert.match(await page.locator('#btn-view').innerText(), /Whole field|Overview/i);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       const a = await sample();
+      assert.ok(a.view.layerW <= a.view.cw && a.view.layerH <= a.view.ch, 'overview must fit the complete tray');
+      assert.ok(a.view.ox >= 0 && a.view.oy >= 0, 'overview tray must stay inside the canvas');
       await page.waitForTimeout(300);
       assert.deepEqual((await sample()).view, a.view, 'resize must settle without camera drift');
       assert.equal(await page.evaluate(() => window.__blankResizes), 0, 'real resize callback must redraw before yielding');
       await page.screenshot({ path: `.ai/previews/art-${viewport.width}.png`, fullPage: true });
     }
+    await page.locator('#btn-view').click();
+    assert.match(await page.locator('#btn-view').innerText(), /Close-up/i);
+    await page.waitForTimeout(500);
+    await page.locator('#field').screenshot({ path: '.ai/previews/corn-detail.png' });
+    await page.locator('#btn-view').click();
+    assert.match(await page.locator('#btn-view').innerText(), /Whole field|Overview/i);
     assert.deepEqual(errors, []);
     console.log('Render PASS: art default, identical idle pixels, no idle backing-store clears, no same-size resize flash, fixed overview while driving, stable responsive views.');
   } finally { await browser.close(); }
