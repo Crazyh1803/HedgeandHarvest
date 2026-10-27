@@ -14,7 +14,12 @@
       <h1>Cornfield <em>Carver</em></h1>
       <p class="tagline">Carve a path through the corn, then run it.</p>
     </div>
-    <button id="btn-help" class="btn ghost" type="button">How to play</button>
+    <div class="top-actions">
+      <button id="btn-music" class="btn ghost tog" type="button" aria-pressed="false">Music: Off</button>
+      <button id="btn-sfx" class="btn ghost tog" type="button" aria-pressed="false">Sounds: Off</button>
+      <button id="btn-help" class="btn ghost" type="button">How to play</button>
+    </div>
+    <p id="audio-note" class="audio-note" role="status" hidden>Sound isn't available in this browser.</p>
   </header>
 
   <main class="layout">
@@ -183,6 +188,7 @@
   </div>
 </div>
 
+<script src="audio.js"></script>
 <script src="game.js"></script>
 </body>
 </html>
