@@ -180,12 +180,22 @@ test('strokes coalesce into one undo step and carveTo drives the tractor', () =>
 test('undo history is bounded', () => {
   const s = C.newBlank({ size: 'large', season: 'summer', animal: 'dog', seed: 0, name: 'x' });
   for (let i = 0; i < C.MAX_UNDO + 60; i++) {
-    C.moveTractor(s, i % 2 ? 0 : 1, i % 2 ? 1 : 0);
-    if (s.tractor.x >= s.w - 1 || s.tractor.y >= s.h - 1) break;
+    C.regenerate(s, i);
   }
-  for (let i = 0; i < 400; i++) { C.moveTractor(s, 0, -1); C.moveTractor(s, 1, 0); }
-  assert.ok(s.history.length <= C.MAX_UNDO);
-  assert.ok(s.history.length > 0);
+  assert.equal(s.history.length, C.MAX_UNDO);
+  for (let i = 0; i < C.MAX_UNDO; i++) assert.equal(C.undo(s), true);
+  assert.equal(s.seed, 59);
+  assert.equal(C.undo(s), false);
+});
+
+test('undo after a completed run resets the runner even when its exit stays open', () => {
+  const s = mk('small', 'summer', 21);
+  C.regenerate(s, 21);
+  for (const [x, y] of C.findPath(s, s.run.x, s.run.y)) C.moveRunner(s, x - s.run.x, y - s.run.y);
+  assert.equal(s.run.won, true);
+  assert.equal(C.undo(s), true);
+  assert.equal(s.run.won, false);
+  assert.deepEqual([s.run.x, s.run.y], [s.start.x, s.start.y]);
 });
 
 test('regenerate and replant are undoable, including start and exit', () => {

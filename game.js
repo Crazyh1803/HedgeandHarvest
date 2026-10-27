@@ -162,7 +162,7 @@
     s.exit = { x: e.exit.x, y: e.exit.y };
     s.seed = e.seed;
     s.tractor = { x: e.tx, y: e.ty, dir: e.td };
-    if (layoutChanged || s.grid[idx(s, s.run.x, s.run.y)] === 1) resetRun(s);
+    if (s.run.won || layoutChanged || s.grid[idx(s, s.run.x, s.run.y)] === 1) resetRun(s);
     s.dirty = true;
     return true;
   }
@@ -823,7 +823,7 @@
 
     /* ---- actions ---- */
     function startTimer() {
-      if (ui.running || S.run.won) return;
+      if (ui.running) return;
       ui.startedAt = performance.now() - ui.elapsed; ui.running = true;
     }
     function victory() {
