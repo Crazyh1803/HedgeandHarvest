@@ -1,0 +1,13 @@
+# Art-first field and stable toy diorama
+
+User feedback: flashes while crossing screen, idle camera changes, prefers overview; art should be default and maze an optional toggle with user-placed start/end; more dimensional toy animals/tractor and stalks with ears (current corn looks like pumpkin); music faster.
+
+Plan and split: Claude handles game.js/index.html/styles.css/audio.js and core tests in one isolated delegation (procedural drawing code only). Codex diagnoses current idle/resize behavior, integrates, updates README and browser regression tests, verifies screenshots and tests, and reviews. No separate generated art assets or engines. One feature branch and coherent commits.
+
+Architecture proposal: pure core retains grids. Add explicit art/maze creation purpose, default art; saved version 2 includes purpose and user-selected gates, parser migrates version 1 as maze. Keep old local saves and shared creations valid; never destroy restored work. Art mode starts fully planted except tractor footprint, hides runner/gates/maze-specific HUD, maze toggle reveals place-start/place-exit tools, generation optional and never necessary. Gates place on any distinct in-bounds cells, carve gate footprints, undoable, reset run and saved/exported. Maze toggle preserves art and has no automatic generation. Runner only in maze mode. New size/reset in art creates blank art. Saved maze loads in maze mode.
+
+Camera: default whole-field fit on every device, no auto close-up. Explicit overview/detail toggle only; stable measured CSS dimensions, do not repeatedly reset canvas backing store; fit must include complete tray at all sizes. Coordinate mapping consistent through zoom and pointer input. Inspect why moving/idle might reset or flash. Seeded static foliage; no flickering/changing per-frame random art. Remove bright drifting ambience if a source of visual flashes, honor reduced motion. More depth via a fixed oblique 2.5D view and raised shapes/shadows but preserve clear cell navigation. Corn must visibly have stems, arching tapered leaves, gold elongated ears/kernel rows/tassels, seasonal husks rather than round orange puffs. Tractor cabin/fenders/large tires, animal volumes/feet/shadows enhanced. Occlusion should be consistent and never hide the active player.
+
+Music speed 66 -> around 86 BPM while preserving gentle independent channels.
+
+Verification: ak-test; browser default art and overview, idle stable canvas transform/dimensions/image samples over several seconds, movement nonflicker, art-to-maze preserves grid, pointer place start/end then run route, undo/gate import roundtrip and v1 migration, resize/touch/PNG. Independent ak-review, address findings, clean working tree.
