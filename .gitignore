@@ -1,0 +1,4 @@
+.ai/last-test.log
+.ai/**/*.log
+node_modules/
+

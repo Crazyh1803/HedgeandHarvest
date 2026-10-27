@@ -1,0 +1,1543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Cornfield Carver - Tractor Maze & Field Art</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Nunito:wght@600;800;900&display=swap');
+
+    body {
+      font-family: 'Nunito', sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      overflow: hidden;
+      background-color: #2b1f14;
+    }
+
+    .font-farm {
+      font-family: 'Fredoka', cursive, sans-serif;
+    }
+
+    /* Custom scrollbars and styling */
+    .wood-panel {
+      background: linear-gradient(180deg, #8b5a2b 0%, #683e18 100%);
+      border: 3px solid #4a2c11;
+      box-shadow: inset 0 2px 4px rgba(255,255,255,0.2), 0 6px 16px rgba(0,0,0,0.4);
+    }
+
+    .wood-btn {
+      background: linear-gradient(180deg, #d97706 0%, #b45309 100%);
+      border: 2px solid #78350f;
+      box-shadow: 0 4px 0 #78350f, 0 6px 8px rgba(0,0,0,0.3);
+      transition: all 0.1s ease;
+    }
+    .wood-btn:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #78350f, 0 2px 4px rgba(0,0,0,0.3);
+    }
+    .wood-btn.active {
+      background: linear-gradient(180deg, #65a30d 0%, #4d7c0f 100%);
+      border-color: #365314;
+      box-shadow: 0 4px 0 #365314;
+    }
+
+    /* Virtual Joystick */
+    #joystick-zone {
+      touch-action: none;
+    }
+    .joystick-base {
+      width: 120px;
+      height: 120px;
+      background: rgba(255, 255, 255, 0.25);
+      border: 3px solid rgba(255, 255, 255, 0.45);
+      border-radius: 50%;
+      position: absolute;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      backdrop-filter: blur(4px);
+    }
+    .joystick-stick {
+      width: 50px;
+      height: 50px;
+      background: #f59e0b;
+      border: 3px solid #fff;
+      border-radius: 50%;
+      position: absolute;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+    }
+
+    /* Notification Toast */
+    #toast {
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+  </style>
+</head>
+<body class="w-screen h-screen flex flex-col items-center justify-between p-2 select-none">
+
+  <!-- Top HUD Bar -->
+  <header class="w-full max-w-6xl flex items-center justify-between gap-2 px-3 py-2 z-20 wood-panel rounded-2xl text-amber-100">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-amber-500 border-2 border-amber-300 flex items-center justify-center text-white text-xl shadow">
+        <i class="fa-solid fa-tractor"></i>
+      </div>
+      <div>
+        <h1 class="font-farm text-lg md:text-xl font-bold tracking-wide text-amber-200 leading-tight">Cornfield Carver</h1>
+        <div class="flex items-center gap-3 text-xs md:text-sm text-amber-200/90 font-medium">
+          <span><i class="fa-solid fa-wheat-awn text-yellow-400 mr-1"></i>Cleared: <strong id="cleared-stat" class="text-white">0%</strong></span>
+          <span class="hidden sm:inline">|</span>
+          <span class="hidden sm:inline"><i class="fa-solid fa-basket-shopping text-orange-400 mr-1"></i>Bushels: <strong id="bushels-stat" class="text-white">0</strong></span>
+          <span class="hidden sm:inline">|</span>
+          <span><i class="fa-regular fa-clock text-amber-300 mr-1"></i>Time: <strong id="time-stat" class="text-white">00:00</strong></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mode Selector & Action Buttons -->
+    <div class="flex items-center gap-1.5 md:gap-2">
+      <!-- Mode toggles -->
+      <div class="bg-black/30 p-1 rounded-xl flex items-center gap-1 border border-amber-900/40">
+        <button id="btn-mode-tractor" class="wood-btn active px-2.5 py-1.5 rounded-lg text-xs md:text-sm font-bold flex items-center gap-1" title="Tractor Driving Mode (Carve paths)">
+          <i class="fa-solid fa-tractor"></i> <span class="hidden sm:inline">Tractor</span>
+        </button>
+        <button id="btn-mode-walker" class="wood-btn px-2.5 py-1.5 rounded-lg text-xs md:text-sm font-bold flex items-center gap-1" title="Test Maze on Foot (Walk through your maze)">
+          <i class="fa-solid fa-person-walking"></i> <span class="hidden sm:inline">Maze Runner</span>
+        </button>
+      </div>
+
+      <!-- Quick Actions -->
+      <button id="btn-cut-width" class="wood-btn px-2.5 py-1.5 rounded-xl text-xs md:text-sm font-bold flex items-center gap-1" title="Toggle Cutting Width (1 or 3 tiles)">
+        <i class="fa-solid fa-arrows-left-right-to-line"></i> <span id="width-label">1x</span>
+      </button>
+
+      <button id="btn-auto-maze" class="wood-btn px-2.5 py-1.5 rounded-xl text-xs md:text-sm font-bold flex items-center gap-1" title="Auto-Carve a Labyrinth Maze">
+        <i class="fa-solid fa-network-wired"></i> <span class="hidden md:inline">Auto-Maze</span>
+      </button>
+
+      <button id="btn-audio" class="wood-btn px-2.5 py-1.5 rounded-xl text-xs md:text-sm font-bold" title="Toggle Sound & Farm Ambience">
+        <i id="audio-icon" class="fa-solid fa-volume-high"></i>
+      </button>
+
+      <button id="btn-help" class="wood-btn px-2.5 py-1.5 rounded-xl text-xs md:text-sm font-bold" title="Help & Controls">
+        <i class="fa-solid fa-circle-question"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Canvas Container -->
+  <main class="relative w-full max-w-6xl flex-1 my-1.5 rounded-2xl overflow-hidden border-4 border-[#4a2c11] shadow-2xl bg-[#3f2a17]">
+    <canvas id="gameCanvas" class="w-full h-full block cursor-crosshair"></canvas>
+
+    <!-- Minimap Overlay (Top Right) -->
+    <div id="minimap-container" class="absolute top-3 right-3 bg-stone-900/85 p-2 rounded-xl border-2 border-amber-600/70 shadow-lg flex flex-col items-center">
+      <div class="flex items-center justify-between w-full mb-1 text-[11px] font-bold text-amber-200">
+        <span>OVERVIEW</span>
+        <button id="btn-zoom-toggle" class="hover:text-white transition px-1"><i class="fa-solid fa-magnifying-glass"></i></button>
+      </div>
+      <canvas id="minimapCanvas" width="130" height="130" class="rounded border border-amber-900/60 bg-[#2e1d0f]"></canvas>
+    </div>
+
+    <!-- On-screen Horn button / interactive banner -->
+    <button id="btn-horn" class="absolute top-3 left-3 bg-amber-600/90 hover:bg-amber-500 border-2 border-amber-300 text-white font-farm text-xs md:text-sm px-3 py-1.5 rounded-xl shadow-lg flex items-center gap-2 active:scale-95 transition">
+      <i class="fa-solid fa-bullhorn text-yellow-300"></i> Honk (H)
+    </button>
+
+    <!-- Floating Toast Notification -->
+    <div id="toast" class="absolute top-14 left-1/2 -translate-x-1/2 opacity-0 pointer-events-none bg-stone-900/90 border border-amber-500 text-amber-200 text-sm font-bold px-4 py-2 rounded-xl shadow-xl flex items-center gap-2 z-30">
+      <i id="toast-icon" class="fa-solid fa-info-circle text-yellow-400"></i>
+      <span id="toast-msg">Welcome to your farm!</span>
+    </div>
+
+    <!-- Maze Runner Status Overlay (Shown only in Runner Mode) -->
+    <div id="runner-banner" class="hidden absolute bottom-4 left-1/2 -translate-x-1/2 bg-amber-900/90 text-amber-100 border-2 border-amber-400 font-farm px-4 py-2 rounded-2xl shadow-xl flex items-center gap-3 text-sm z-20">
+      <span class="w-3 h-3 rounded-full bg-emerald-400 animate-pulse"></span>
+      <span>Maze Runner Mode: Walk from <strong class="text-green-300">Entrance (Green)</strong> to <strong class="text-red-300">Barn Exit (Red)</strong>!</span>
+      <button id="btn-back-to-tractor" class="bg-amber-600 hover:bg-amber-500 text-white px-2 py-0.5 rounded-lg text-xs font-bold ml-2">Back to Tractor</button>
+    </div>
+
+    <!-- Touch Joystick Zone (Mobile Only) -->
+    <div id="joystick-zone" class="absolute inset-0 pointer-events-none md:hidden"></div>
+  </main>
+
+  <!-- Bottom Control Bar -->
+  <footer class="w-full max-w-6xl flex items-center justify-between gap-2 px-3 py-2 z-20 wood-panel rounded-2xl text-amber-100 text-xs md:text-sm">
+    <div class="flex items-center gap-2 flex-wrap">
+      <button id="btn-replant" class="wood-btn px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5" title="Replant all cut stalks">
+        <i class="fa-solid fa-seedling text-emerald-300"></i> <span>Replant All</span>
+      </button>
+      <button id="btn-export" class="wood-btn px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5" title="Download High-Res Snapshot of your Corn Maze Art">
+        <i class="fa-solid fa-camera text-sky-300"></i> <span>Export Art</span>
+      </button>
+      <button id="btn-clear-all" class="wood-btn px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 text-amber-200" title="Mow down entire field">
+        <i class="fa-solid fa-tractor text-yellow-400"></i> <span>Mow All</span>
+      </button>
+    </div>
+
+    <!-- On-screen directional pad for touch / simple steering -->
+    <div class="flex items-center gap-1 md:hidden">
+      <button id="btn-touch-horn" class="w-10 h-10 rounded-xl bg-amber-600 border border-amber-300 flex items-center justify-center text-white active:bg-amber-700">
+        <i class="fa-solid fa-bullhorn"></i>
+      </button>
+    </div>
+
+    <div class="hidden lg:flex items-center gap-4 text-amber-200/80 text-xs">
+      <span><kbd class="bg-black/40 px-1.5 py-0.5 rounded border border-amber-800">W/A/S/D</kbd> or <kbd class="bg-black/40 px-1.5 py-0.5 rounded border border-amber-800">Arrows</kbd> Drive</span>
+      <span><kbd class="bg-black/40 px-1.5 py-0.5 rounded border border-amber-800">H</kbd> Horn</span>
+      <span><kbd class="bg-black/40 px-1.5 py-0.5 rounded border border-amber-800">M</kbd> Switch Mode</span>
+      <span><kbd class="bg-black/40 px-1.5 py-0.5 rounded border border-amber-800">Space</kbd> Boost</span>
+    </div>
+  </footer>
+
+  <!-- Help & Instructions Modal -->
+  <div id="help-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+    <div class="wood-panel max-w-md w-full p-6 rounded-3xl text-amber-100 shadow-2xl relative border-4 border-[#4a2c11]">
+      <button id="btn-close-help" class="absolute top-4 right-4 text-amber-300 hover:text-white text-xl">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-12 h-12 rounded-2xl bg-amber-500 border-2 border-amber-300 flex items-center justify-center text-white text-2xl shadow">
+          <i class="fa-solid fa-tractor"></i>
+        </div>
+        <div>
+          <h2 class="font-farm text-2xl font-bold text-amber-200">How to Play</h2>
+          <p class="text-xs text-amber-300">Carve designs, craft mazes, or test them on foot!</p>
+        </div>
+      </div>
+
+      <div class="space-y-3 text-xs md:text-sm text-amber-100/90 leading-relaxed">
+        <div class="bg-black/30 p-2.5 rounded-xl border border-amber-900/60">
+          <strong class="text-amber-300 block mb-1"><i class="fa-solid fa-gamepad mr-1"></i> Driving Controls:</strong>
+          <ul class="list-disc pl-4 space-y-0.5">
+            <li><strong class="text-white">W / Up</strong> : Accelerate forward</li>
+            <li><strong class="text-white">S / Down</strong> : Reverse / brake</li>
+            <li><strong class="text-white">A / D / Left / Right</strong> : Steer wheels</li>
+            <li><strong class="text-white">H</strong> : Honk tractor horn</li>
+            <li><strong class="text-white">Mobile Touch</strong> : Drag anywhere on the screen for the virtual joystick!</li>
+          </ul>
+        </div>
+
+        <div class="bg-black/30 p-2.5 rounded-xl border border-amber-900/60">
+          <strong class="text-amber-300 block mb-1"><i class="fa-solid fa-palette mr-1"></i> Creative Tools:</strong>
+          <ul class="list-disc pl-4 space-y-0.5">
+            <li><strong>Width (1x / 3x)</strong>: Toggle between standard mower and giant combine harvester cutter.</li>
+            <li><strong>Auto-Maze</strong>: Instantly carves out a labyrinth maze with entrance & exit.</li>
+            <li><strong>Maze Runner</strong>: Spawn a visitor character to physically walk through and solve your custom maze!</li>
+            <li><strong>Export Art</strong>: Take a high-resolution bird's-eye photo of your farm masterpiece.</li>
+          </ul>
+        </div>
+      </div>
+
+      <button id="btn-got-it" class="w-full mt-5 wood-btn py-2.5 rounded-xl font-farm text-base font-bold text-white shadow-lg">
+        Start Mowing!
+      </button>
+    </div>
+  </div>
+
+  <!-- Audio, Physics and Game Logic -->
+  <script>
+    /* ==========================================================================
+       1. SOUND SYNTHESIS ENGINE (Web Audio API - No external files)
+       ========================================================================== */
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+        this.engineGain = null;
+        this.engineOsc1 = null;
+        this.engineOsc2 = null;
+        this.engineFilter = null;
+        this.isEngineRunning = false;
+        this.lastMowSoundTime = 0;
+      }
+
+      init() {
+        if (this.ctx) return;
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        this.ctx = new AudioContext();
+
+        // Master Engine loop
+        this.engineOsc1 = this.ctx.createOscillator();
+        this.engineOsc2 = this.ctx.createOscillator();
+        this.engineFilter = this.ctx.createBiquadFilter();
+        this.engineGain = this.ctx.createGain();
+
+        this.engineOsc1.type = 'sawtooth';
+        this.engineOsc2.type = 'triangle';
+        this.engineOsc1.frequency.value = 55; // Low A
+        this.engineOsc2.frequency.value = 27.5;
+
+        this.engineFilter.type = 'lowpass';
+        this.engineFilter.frequency.value = 240;
+
+        this.engineGain.gain.value = 0.04;
+
+        this.engineOsc1.connect(this.engineFilter);
+        this.engineOsc2.connect(this.engineFilter);
+        this.engineFilter.connect(this.engineGain);
+        this.engineGain.connect(this.ctx.destination);
+
+        this.engineOsc1.start();
+        this.engineOsc2.start();
+        this.isEngineRunning = true;
+
+        // Start ambient nature chimes
+        this.startFarmAmbience();
+      }
+
+      toggleAudio() {
+        this.enabled = !this.enabled;
+        if (!this.enabled && this.engineGain) {
+          this.engineGain.gain.setValueAtTime(0, this.ctx.currentTime);
+        } else if (this.enabled && this.engineGain) {
+          this.engineGain.gain.setValueAtTime(0.04, this.ctx.currentTime);
+        }
+        return this.enabled;
+      }
+
+      updateEngine(speed, isMoving) {
+        if (!this.ctx || !this.enabled) return;
+        const targetPitch = 40 + Math.abs(speed) * 12;
+        const targetGain = isMoving ? 0.08 : 0.035;
+        const now = this.ctx.currentTime;
+        this.engineOsc1.frequency.setTargetAtTime(targetPitch, now, 0.1);
+        this.engineOsc2.frequency.setTargetAtTime(targetPitch * 0.5, now, 0.1);
+        this.engineFilter.frequency.setTargetAtTime(180 + Math.abs(speed) * 90, now, 0.1);
+        this.engineGain.gain.setTargetAtTime(targetGain, now, 0.15);
+      }
+
+      playMowSound() {
+        if (!this.ctx || !this.enabled) return;
+        const now = performance.now();
+        if (now - this.lastMowSoundTime < 80) return; // rate limit rustles
+        this.lastMowSoundTime = now;
+
+        const time = this.ctx.currentTime;
+        // White noise burst for stalk rustle/crunch
+        const bufferSize = this.ctx.sampleRate * 0.08;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.3));
+        }
+
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1200 + Math.random() * 400, time);
+        filter.Q.value = 1.2;
+
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.08, time);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + 0.07);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+        noise.start(time);
+      }
+
+      playHorn() {
+        if (!this.ctx) this.init();
+        if (!this.enabled) return;
+        const time = this.ctx.currentTime;
+
+        const osc1 = this.ctx.createOscillator();
+        const osc2 = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc1.type = 'sawtooth';
+        osc2.type = 'sawtooth';
+        osc1.frequency.setValueAtTime(261.63, time); // C4
+        osc2.frequency.setValueAtTime(329.63, time); // E4
+
+        gain.gain.setValueAtTime(0.18, time);
+        gain.gain.linearRampToValueAtTime(0.18, time + 0.35);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + 0.55);
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc1.start(time);
+        osc2.start(time);
+        osc1.stop(time + 0.6);
+        osc2.stop(time + 0.6);
+      }
+
+      playSuccessFanfare() {
+        if (!this.ctx || !this.enabled) return;
+        const notes = [392, 523.25, 659.25, 783.99]; // G4, C5, E5, G5
+        notes.forEach((freq, i) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          const time = this.ctx.currentTime + i * 0.12;
+
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, time);
+
+          gain.gain.setValueAtTime(0.12, time);
+          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.35);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(time);
+          osc.stop(time + 0.4);
+        });
+      }
+
+      startFarmAmbience() {
+        // Occasional relaxing bird chirps or wind whoosh
+        setInterval(() => {
+          if (!this.enabled || !this.ctx || Math.random() > 0.4) return;
+          const time = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+
+          osc.type = 'sine';
+          const baseFreq = 2200 + Math.random() * 800;
+          osc.frequency.setValueAtTime(baseFreq, time);
+          osc.frequency.linearRampToValueAtTime(baseFreq + 400, time + 0.08);
+          osc.frequency.linearRampToValueAtTime(baseFreq - 200, time + 0.16);
+
+          gain.gain.setValueAtTime(0.02, time);
+          gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.18);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(time);
+          osc.stop(time + 0.2);
+        }, 4000);
+      }
+    }
+
+    const sound = new SoundEngine();
+
+    /* ==========================================================================
+       2. GRID & FIELD SYSTEM
+       ========================================================================== */
+    const GRID_COLS = 55;
+    const GRID_ROWS = 45;
+    const TILE_SIZE = 40; // World pixels per corn tile
+    const WORLD_WIDTH = GRID_COLS * TILE_SIZE;
+    const WORLD_HEIGHT = GRID_ROWS * TILE_SIZE;
+
+    // Tile States: 1 = Full Corn, 0 = Mowed Path, 2 = Entrance, 3 = Barn/Exit
+    const field = new Uint8Array(GRID_COLS * GRID_ROWS);
+    // Tire track direction/overlay map
+    const trackOverlay = new Float32Array(GRID_COLS * GRID_ROWS); // Angle of vehicle when cut
+
+    function initField(allCorn = true) {
+      for (let i = 0; i < field.length; i++) {
+        field[i] = allCorn ? 1 : 0;
+        trackOverlay[i] = 0;
+      }
+      // Create natural perimeter clearing with fence
+      for (let c = 0; c < GRID_COLS; c++) {
+        field[c] = 0;
+        field[(GRID_ROWS - 1) * GRID_COLS + c] = 0;
+      }
+      for (let r = 0; r < GRID_ROWS; r++) {
+        field[r * GRID_COLS] = 0;
+        field[r * GRID_COLS + (GRID_COLS - 1)] = 0;
+      }
+    }
+
+    /* ==========================================================================
+       3. TRACTOR & WALKER PHYSICS ENTITIES
+       ========================================================================== */
+    const tractor = {
+      x: TILE_SIZE * 3,
+      y: TILE_SIZE * 3,
+      angle: 0, // In radians
+      speed: 0,
+      maxSpeed: 4.8,
+      acceleration: 0.16,
+      friction: 0.94,
+      steerAngle: 0,
+      maxSteer: 0.048,
+      width: 32,
+      height: 48,
+      cutWidth: 1, // 1 tile or 3 tiles
+      wheelRot: 0
+    };
+
+    const walker = {
+      x: TILE_SIZE * 2.5,
+      y: TILE_SIZE * 2.5,
+      angle: 0,
+      speed: 2.8,
+      radius: 12,
+      active: false,
+      stepCycle: 0
+    };
+
+    // Entrance & Exit points for maze testing
+    let mazeEntrance = { c: 2, r: 2 };
+    let mazeExit = { c: GRID_COLS - 3, r: GRID_ROWS - 3 };
+
+    // Camera
+    const camera = {
+      x: tractor.x,
+      y: tractor.y,
+      zoom: 1.0,
+      targetZoom: 1.0
+    };
+
+    // Particles (chaff, flying corn, exhaust puffs)
+    const particles = [];
+    const MAX_PARTICLES = 300;
+
+    function spawnChaff(x, y, count = 4) {
+      for (let i = 0; i < count; i++) {
+        if (particles.length > MAX_PARTICLES) particles.shift();
+        const angle = Math.random() * Math.PI * 2;
+        const spd = 1 + Math.random() * 3.5;
+        const isCob = Math.random() > 0.75;
+        particles.push({
+          x: x + (Math.random() - 0.5) * 20,
+          y: y + (Math.random() - 0.5) * 20,
+          vx: Math.cos(angle) * spd,
+          vy: Math.sin(angle) * spd,
+          life: 1.0,
+          decay: 0.02 + Math.random() * 0.03,
+          size: isCob ? 4 + Math.random() * 3 : 2 + Math.random() * 2,
+          color: isCob ? '#f59e0b' : (Math.random() > 0.4 ? '#84cc16' : '#fef08a'),
+          type: 'leaf'
+        });
+      }
+    }
+
+    function spawnSmoke(x, y) {
+      if (particles.length > MAX_PARTICLES) particles.shift();
+      particles.push({
+        x: x + (Math.random() - 0.5) * 4,
+        y: y + (Math.random() - 0.5) * 4,
+        vx: (Math.random() - 0.5) * 0.4,
+        vy: -0.8 - Math.random() * 0.8,
+        life: 1.0,
+        decay: 0.035,
+        size: 3 + Math.random() * 4,
+        color: 'rgba(210, 210, 210, 0.45)',
+        type: 'smoke'
+      });
+    }
+
+    /* ==========================================================================
+       4. GAME STATE & STATS
+       ========================================================================== */
+    let bushelsHarvested = 0;
+    let totalCornCount = 0;
+    let initialCornTotal = 0;
+    let gameMode = 'tractor'; // 'tractor' or 'walker'
+    let startTime = Date.now();
+    let toastTimeout = null;
+
+    function countCorn() {
+      let count = 0;
+      for (let i = 0; i < field.length; i++) {
+        if (field[i] === 1) count++;
+      }
+      return count;
+    }
+
+    function updateStatsHUD() {
+      const currentCorn = countCorn();
+      const cleared = Math.max(0, initialCornTotal - currentCorn);
+      const percent = initialCornTotal > 0 ? ((cleared / initialCornTotal) * 100).toFixed(1) : 0;
+      document.getElementById('cleared-stat').innerText = `${percent}%`;
+      document.getElementById('bushels-stat').innerText = bushelsHarvested.toLocaleString();
+
+      const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
+      const mins = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
+      const secs = String(elapsedSec % 60).padStart(2, '0');
+      document.getElementById('time-stat').innerText = `${mins}:${secs}`;
+    }
+
+    function showToast(message, icon = 'fa-info-circle') {
+      const toast = document.getElementById('toast');
+      const msgSpan = document.getElementById('toast-msg');
+      const iconEl = document.getElementById('toast-icon');
+
+      msgSpan.innerText = message;
+      iconEl.className = `fa-solid ${icon} text-yellow-400`;
+
+      toast.classList.remove('opacity-0', '-translate-y-2');
+      toast.classList.add('opacity-100', 'translate-y-0');
+
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.remove('opacity-100', 'translate-y-0');
+        toast.classList.add('opacity-0', '-translate-y-2');
+      }, 2600);
+    }
+
+    /* ==========================================================================
+       5. INPUT HANDLING (Keyboard & Touch Joystick)
+       ========================================================================== */
+    const keys = {
+      up: false,
+      down: false,
+      left: false,
+      right: false,
+      boost: false
+    };
+
+    window.addEventListener('keydown', (e) => {
+      // Initialize audio on first gesture
+      sound.init();
+
+      switch (e.key.toLowerCase()) {
+        case 'w':
+        case 'arrowup':
+          keys.up = true;
+          break;
+        case 's':
+        case 'arrowdown':
+          keys.down = true;
+          break;
+        case 'a':
+        case 'arrowleft':
+          keys.left = true;
+          break;
+        case 'd':
+        case 'arrowright':
+          keys.right = true;
+          break;
+        case ' ':
+          keys.boost = true;
+          break;
+        case 'h':
+          sound.playHorn();
+          showToast('HONK HONK! 🚜', 'fa-bullhorn');
+          break;
+        case 'm':
+          toggleMode();
+          break;
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      switch (e.key.toLowerCase()) {
+        case 'w':
+        case 'arrowup':
+          keys.up = false;
+          break;
+        case 's':
+        case 'arrowdown':
+          keys.down = false;
+          break;
+        case 'a':
+        case 'arrowleft':
+          keys.left = false;
+          break;
+        case 'd':
+        case 'arrowright':
+          keys.right = false;
+          break;
+        case ' ':
+          keys.boost = false;
+          break;
+      }
+    });
+
+    // Touch Virtual Joystick
+    const joystickZone = document.getElementById('joystick-zone');
+    let touchId = null;
+    let joyCenter = { x: 0, y: 0 };
+    let joyCurrent = { x: 0, y: 0 };
+    let joyBaseEl = null;
+    let joyStickEl = null;
+
+    function handleTouchStart(e) {
+      sound.init();
+      if (touchId !== null) return;
+      const t = e.changedTouches[0];
+      touchId = t.identifier;
+      joyCenter = { x: t.clientX, y: t.clientY };
+      joyCurrent = { x: t.clientX, y: t.clientY };
+
+      if (!joyBaseEl) {
+        joyBaseEl = document.createElement('div');
+        joyBaseEl.className = 'joystick-base';
+        document.body.appendChild(joyBaseEl);
+
+        joyStickEl = document.createElement('div');
+        joyStickEl.className = 'joystick-stick';
+        document.body.appendChild(joyStickEl);
+      }
+
+      joyBaseEl.style.display = 'block';
+      joyStickEl.style.display = 'block';
+      joyBaseEl.style.left = `${joyCenter.x}px`;
+      joyBaseEl.style.top = `${joyCenter.y}px`;
+      joyStickEl.style.left = `${joyCenter.x}px`;
+      joyStickEl.style.top = `${joyCenter.y}px`;
+    }
+
+    function handleTouchMove(e) {
+      if (touchId === null) return;
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        if (t.identifier === touchId) {
+          joyCurrent = { x: t.clientX, y: t.clientY };
+          const dx = joyCurrent.x - joyCenter.x;
+          const dy = joyCurrent.y - joyCenter.y;
+          const dist = Math.hypot(dx, dy);
+          const maxDist = 55;
+
+          const angle = Math.atan2(dy, dx);
+          const cappedDist = Math.min(dist, maxDist);
+          const stickX = joyCenter.x + Math.cos(angle) * cappedDist;
+          const stickY = joyCenter.y + Math.sin(angle) * cappedDist;
+
+          joyStickEl.style.left = `${stickX}px`;
+          joyStickEl.style.top = `${stickY}px`;
+
+          // Map to keys
+          const normX = (stickX - joyCenter.x) / maxDist;
+          const normY = (stickY - joyCenter.y) / maxDist;
+
+          keys.left = normX < -0.28;
+          keys.right = normX > 0.28;
+          keys.up = normY < -0.28;
+          keys.down = normY > 0.28;
+          break;
+        }
+      }
+    }
+
+    function handleTouchEnd(e) {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === touchId) {
+          touchId = null;
+          keys.up = keys.down = keys.left = keys.right = false;
+          if (joyBaseEl) joyBaseEl.style.display = 'none';
+          if (joyStickEl) joyStickEl.style.display = 'none';
+          break;
+        }
+      }
+    }
+
+    window.addEventListener('touchstart', handleTouchStart, { passive: false });
+    window.addEventListener('touchmove', handleTouchMove, { passive: false });
+    window.addEventListener('touchend', handleTouchEnd);
+    window.addEventListener('touchcancel', handleTouchEnd);
+
+    /* ==========================================================================
+       6. ALGORITHMIC MAZE GENERATOR (Recursive Backtracker)
+       ========================================================================== */
+    function generateLabyrinthMaze() {
+      // Fill grid with corn
+      for (let i = 0; i < field.length; i++) {
+        field[i] = 1;
+      }
+
+      // We generate on odd grid indices so paths have walls in between
+      const visited = new Uint8Array(GRID_COLS * GRID_ROWS);
+      const stack = [];
+
+      const startC = 3;
+      const startR = 3;
+
+      function getIdx(c, r) {
+        return r * GRID_COLS + c;
+      }
+
+      field[getIdx(startC, startR)] = 0;
+      visited[getIdx(startC, startR)] = 1;
+      stack.push({ c: startC, r: startR });
+
+      const dirs = [
+        { dc: 0, dr: -2 }, // Up
+        { dc: 0, dr: 2 },  // Down
+        { dc: -2, dr: 0 }, // Left
+        { dc: 2, dr: 0 }   // Right
+      ];
+
+      while (stack.length > 0) {
+        const current = stack[stack.length - 1];
+        // Shuffle neighbors
+        const neighbors = [];
+        for (const d of dirs) {
+          const nc = current.c + d.dc;
+          const nr = current.r + d.dr;
+          if (nc > 1 && nc < GRID_COLS - 2 && nr > 1 && nr < GRID_ROWS - 2) {
+            if (!visited[getIdx(nc, nr)]) {
+              neighbors.push({ c: nc, r: nr, betweenC: current.c + d.dc / 2, betweenR: current.r + d.dr / 2 });
+            }
+          }
+        }
+
+        if (neighbors.length > 0) {
+          // Choose random neighbor
+          const next = neighbors[Math.floor(Math.random() * neighbors.length)];
+          // Carve wall between
+          field[getIdx(next.betweenC, next.betweenR)] = 0;
+          field[getIdx(next.c, next.r)] = 0;
+          visited[getIdx(next.c, next.r)] = 1;
+          stack.push(next);
+        } else {
+          stack.pop();
+        }
+      }
+
+      // Add entrance & exit
+      mazeEntrance = { c: 2, r: 3 };
+      mazeExit = { c: GRID_COLS - 3, r: GRID_ROWS - 4 };
+
+      field[getIdx(mazeEntrance.c, mazeEntrance.r)] = 0;
+      field[getIdx(mazeEntrance.c - 1, mazeEntrance.r)] = 0; // opening to outer edge
+      field[getIdx(mazeExit.c, mazeExit.r)] = 0;
+      field[getIdx(mazeExit.c + 1, mazeExit.r)] = 0;
+
+      // Position tractor at entrance
+      tractor.x = (mazeEntrance.c + 0.5) * TILE_SIZE;
+      tractor.y = (mazeEntrance.r + 0.5) * TILE_SIZE;
+      tractor.speed = 0;
+      tractor.angle = 0;
+
+      showToast('🌽 Labyrinth Maze Carved! Try the Runner Mode!', 'fa-network-wired');
+      sound.playSuccessFanfare();
+    }
+
+    /* ==========================================================================
+       7. MOWING & INTERACTION LOGIC
+       ========================================================================== */
+    function harvestTile(c, r) {
+      if (c < 0 || c >= GRID_COLS || r < 0 || r >= GRID_ROWS) return;
+      const idx = r * GRID_COLS + c;
+      if (field[idx] === 1) {
+        field[idx] = 0;
+        trackOverlay[idx] = tractor.angle;
+        bushelsHarvested += 12;
+        sound.playMowSound();
+        spawnChaff((c + 0.5) * TILE_SIZE, (r + 0.5) * TILE_SIZE, 6);
+      }
+    }
+
+    function checkCutting() {
+      // Header cutter is at front of tractor
+      const frontDist = tractor.height * 0.48;
+      const cutterX = tractor.x + Math.cos(tractor.angle) * frontDist;
+      const cutterY = tractor.y + Math.sin(tractor.angle) * frontDist;
+
+      // Central tile
+      const centerC = Math.floor(cutterX / TILE_SIZE);
+      const centerR = Math.floor(cutterY / TILE_SIZE);
+      harvestTile(centerC, centerR);
+
+      // If wide 3x cutter active
+      if (tractor.cutWidth === 3) {
+        const perpAngle = tractor.angle + Math.PI / 2;
+        const leftX = cutterX + Math.cos(perpAngle) * (TILE_SIZE * 0.85);
+        const leftY = cutterY + Math.sin(perpAngle) * (TILE_SIZE * 0.85);
+        const rightX = cutterX - Math.cos(perpAngle) * (TILE_SIZE * 0.85);
+        const rightY = cutterY - Math.sin(perpAngle) * (TILE_SIZE * 0.85);
+
+        harvestTile(Math.floor(leftX / TILE_SIZE), Math.floor(leftY / TILE_SIZE));
+        harvestTile(Math.floor(rightX / TILE_SIZE), Math.floor(rightY / TILE_SIZE));
+      }
+    }
+
+    /* ==========================================================================
+       8. UPDATE PHYSICS & ENTITIES
+       ========================================================================== */
+    function updateTractor() {
+      // Acceleration & braking
+      let targetMax = tractor.maxSpeed;
+      if (keys.boost) targetMax *= 1.4;
+
+      if (keys.up) {
+        tractor.speed = Math.min(tractor.speed + tractor.acceleration, targetMax);
+      } else if (keys.down) {
+        tractor.speed = Math.max(tractor.speed - tractor.acceleration, -targetMax * 0.55);
+      } else {
+        tractor.speed *= tractor.friction;
+        if (Math.abs(tractor.speed) < 0.04) tractor.speed = 0;
+      }
+
+      // Steering
+      if (Math.abs(tractor.speed) > 0.05) {
+        const reverseFactor = tractor.speed < 0 ? -1 : 1;
+        if (keys.left) {
+          tractor.angle -= tractor.maxSteer * reverseFactor;
+          tractor.steerAngle = Math.max(tractor.steerAngle - 0.08, -0.45);
+        } else if (keys.right) {
+          tractor.angle += tractor.maxSteer * reverseFactor;
+          tractor.steerAngle = Math.min(tractor.steerAngle + 0.08, 0.45);
+        } else {
+          tractor.steerAngle *= 0.7;
+        }
+      } else {
+        tractor.steerAngle *= 0.7;
+      }
+
+      // Move forward
+      tractor.x += Math.cos(tractor.angle) * tractor.speed;
+      tractor.y += Math.sin(tractor.angle) * tractor.speed;
+      tractor.wheelRot += tractor.speed * 0.15;
+
+      // Keep within world bounds
+      const margin = 20;
+      tractor.x = Math.max(margin, Math.min(WORLD_WIDTH - margin, tractor.x));
+      tractor.y = Math.max(margin, Math.min(WORLD_HEIGHT - margin, tractor.y));
+
+      // Cut corn
+      if (Math.abs(tractor.speed) > 0.1) {
+        checkCutting();
+      }
+
+      // Exhaust smoke from chimney
+      if (Math.random() > 0.4) {
+        const exhaustDist = 8;
+        const exX = tractor.x - Math.cos(tractor.angle) * exhaustDist + Math.sin(tractor.angle) * 7;
+        const exY = tractor.y - Math.sin(tractor.angle) * exhaustDist - Math.cos(tractor.angle) * 7;
+        spawnSmoke(exX, exY);
+      }
+
+      // Sound update
+      sound.updateEngine(tractor.speed, Math.abs(tractor.speed) > 0.1);
+    }
+
+    function updateWalker() {
+      // In maze runner mode, the character CANNOT walk through standing corn stalks!
+      let dx = 0;
+      let dy = 0;
+      if (keys.up) dy -= 1;
+      if (keys.down) dy += 1;
+      if (keys.left) dx -= 1;
+      if (keys.right) dx += 1;
+
+      if (dx !== 0 || dy !== 0) {
+        const len = Math.hypot(dx, dy);
+        dx /= len;
+        dy /= len;
+
+        walker.angle = Math.atan2(dy, dx);
+        walker.stepCycle += 0.2;
+
+        const nextX = walker.x + dx * walker.speed;
+        const nextY = walker.y + dy * walker.speed;
+
+        // Collision check with standing corn tiles
+        function canPass(px, py) {
+          const c = Math.floor(px / TILE_SIZE);
+          const r = Math.floor(py / TILE_SIZE);
+          if (c < 0 || c >= GRID_COLS || r < 0 || r >= GRID_ROWS) return false;
+          return field[r * GRID_COLS + c] === 0;
+        }
+
+        const r = walker.radius;
+        // Check corners of bounding box
+        if (canPass(nextX - r, walker.y - r) && canPass(nextX + r, walker.y - r) &&
+            canPass(nextX - r, walker.y + r) && canPass(nextX + r, walker.y + r)) {
+          walker.x = nextX;
+        }
+        if (canPass(walker.x - r, nextY - r) && canPass(walker.x + r, nextY - r) &&
+            canPass(walker.x - r, nextY + r) && canPass(walker.x + r, nextY + r)) {
+          walker.y = nextY;
+        }
+
+        // Check if reached exit
+        const exitX = (mazeExit.c + 0.5) * TILE_SIZE;
+        const exitY = (mazeExit.r + 0.5) * TILE_SIZE;
+        if (Math.hypot(walker.x - exitX, walker.y - exitY) < TILE_SIZE * 1.2) {
+          sound.playSuccessFanfare();
+          showToast('🎉 MAZE COMPLETED! You found the Barn Exit!', 'fa-trophy');
+          // Re-place walker at entrance for replay
+          walker.x = (mazeEntrance.c + 0.5) * TILE_SIZE;
+          walker.y = (mazeEntrance.r + 0.5) * TILE_SIZE;
+        }
+      }
+    }
+
+    function updateCamera() {
+      const target = gameMode === 'tractor' ? tractor : walker;
+      // Smooth lerp
+      camera.x += (target.x - camera.x) * 0.1;
+      camera.y += (target.y - camera.y) * 0.1;
+      camera.zoom += (camera.targetZoom - camera.zoom) * 0.08;
+    }
+
+    function updateParticles() {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= p.decay;
+        if (p.life <= 0) {
+          particles.splice(i, 1);
+        }
+      }
+    }
+
+    /* ==========================================================================
+       9. RENDERING SYSTEM (CANVAS 2D)
+       ========================================================================== */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const minimapCanvas = document.getElementById('minimapCanvas');
+    const miniCtx = minimapCanvas.getContext('2d');
+
+    function resizeCanvas() {
+      const container = canvas.parentElement;
+      canvas.width = container.clientWidth;
+      canvas.height = container.clientHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // Stalk swaying timing
+    let swayTime = 0;
+
+    function renderWorld() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.save();
+      // Center camera
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.scale(camera.zoom, camera.zoom);
+      ctx.translate(-camera.x, -camera.y);
+
+      // 1. Draw Farmland Dirt Ground
+      ctx.fillStyle = '#4a2c11';
+      ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+
+      // Visible tile bounds for optimization
+      const halfW = (canvas.width / 2) / camera.zoom;
+      const halfH = (canvas.height / 2) / camera.zoom;
+      const startC = Math.max(0, Math.floor((camera.x - halfW) / TILE_SIZE) - 1);
+      const endC = Math.min(GRID_COLS - 1, Math.ceil((camera.x + halfW) / TILE_SIZE) + 1);
+      const startR = Math.max(0, Math.floor((camera.y - halfH) / TILE_SIZE) - 1);
+      const endR = Math.min(GRID_ROWS - 1, Math.ceil((camera.y + halfH) / TILE_SIZE) + 1);
+
+      // 2. Draw Dirt Field & Tread Marks
+      for (let r = startR; r <= endR; r++) {
+        for (let c = startC; c <= endC; c++) {
+          const idx = r * GRID_COLS + c;
+          const x = c * TILE_SIZE;
+          const y = r * TILE_SIZE;
+
+          if (field[idx] === 0) {
+            // Cut mowed path - rich soil with track ruts
+            ctx.fillStyle = '#5c3818';
+            ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+
+            // Subtle tire treads
+            ctx.save();
+            ctx.translate(x + TILE_SIZE / 2, y + TILE_SIZE / 2);
+            ctx.rotate(trackOverlay[idx]);
+            ctx.fillStyle = 'rgba(40, 20, 5, 0.4)';
+            ctx.fillRect(-TILE_SIZE * 0.35, -TILE_SIZE * 0.3, TILE_SIZE * 0.7, 4);
+            ctx.fillRect(-TILE_SIZE * 0.35, TILE_SIZE * 0.2, TILE_SIZE * 0.7, 4);
+            ctx.restore();
+          }
+        }
+      }
+
+      // 3. Draw Maze Entrance / Exit Markers
+      drawMarker(mazeEntrance.c, mazeEntrance.r, '#10b981', 'START', 'fa-flag');
+      drawMarker(mazeExit.c, mazeExit.r, '#ef4444', 'FINISH BARN', 'fa-warehouse');
+
+      // 4. Draw Standing Corn Stalks (Dense layered stalks)
+      swayTime += 0.04;
+      for (let r = startR; r <= endR; r++) {
+        for (let c = startC; c <= endC; c++) {
+          const idx = r * GRID_COLS + c;
+          if (field[idx] === 1) {
+            drawCornTile(c, r, swayTime);
+          }
+        }
+      }
+
+      // 5. Draw Particles (flying corn, chaff, smoke)
+      particles.forEach(p => {
+        ctx.save();
+        ctx.globalAlpha = p.life;
+        ctx.fillStyle = p.color;
+        if (p.type === 'smoke') {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          // Leaf or cob flake
+          ctx.beginPath();
+          ctx.ellipse(p.x, p.y, p.size, p.size * 0.45, p.vx * 0.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      });
+
+      // 6. Draw Characters / Vehicles
+      if (gameMode === 'tractor' || gameMode === 'walker') {
+        drawTractor();
+      }
+      if (gameMode === 'walker') {
+        drawWalker();
+      }
+
+      // 7. Outer Fence Border
+      ctx.strokeStyle = '#78350f';
+      ctx.lineWidth = 8;
+      ctx.strokeRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+
+      ctx.restore();
+
+      // 8. Render Mini-Map Overview
+      renderMinimap();
+    }
+
+    function drawMarker(c, r, color, label, iconClass) {
+      const x = (c + 0.5) * TILE_SIZE;
+      const y = (r + 0.5) * TILE_SIZE;
+
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.35;
+      ctx.beginPath();
+      ctx.arc(x, y, TILE_SIZE * 0.7, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.globalAlpha = 1.0;
+      ctx.fillStyle = color;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(x, y, 14, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Label
+      ctx.font = 'bold 11px Fredoka, sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.shadowColor = 'black';
+      ctx.shadowBlur = 4;
+      ctx.fillText(label, x, y - 20);
+      ctx.restore();
+    }
+
+    function drawCornTile(c, r, time) {
+      const baseX = c * TILE_SIZE;
+      const baseY = r * TILE_SIZE;
+      const tileSeed = (c * 17 + r * 31) % 10;
+      const sway = Math.sin(time + tileSeed) * 2.5;
+
+      // Base soil shadow beneath corn
+      ctx.fillStyle = '#2f5912';
+      ctx.fillRect(baseX, baseY, TILE_SIZE, TILE_SIZE);
+
+      // Stalk clusters (3 stalks per tile for depth)
+      const offsets = [
+        { ox: 10, oy: 10, s: 0.9 },
+        { ox: 28, oy: 14, s: 1.0 },
+        { ox: 18, oy: 28, s: 1.1 }
+      ];
+
+      offsets.forEach((st, i) => {
+        const sx = baseX + st.ox + sway;
+        const sy = baseY + st.oy;
+
+        // Golden/Green Corn Leaves
+        ctx.fillStyle = i % 2 === 0 ? '#4d7c0f' : '#65a30d';
+        ctx.beginPath();
+        ctx.arc(sx, sy, 7 * st.s, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Stalk tip
+        ctx.fillStyle = '#84cc16';
+        ctx.beginPath();
+        ctx.arc(sx + sway * 0.5, sy - 4, 4 * st.s, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Golden corn cob tassel
+        ctx.fillStyle = '#eab308';
+        ctx.beginPath();
+        ctx.arc(sx + sway * 0.8, sy - 2, 2.5 * st.s, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    function drawTractor() {
+      ctx.save();
+      ctx.translate(tractor.x, tractor.y);
+      ctx.rotate(tractor.angle);
+
+      // Shadow
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.beginPath();
+      ctx.roundRect(-20, -16, 44, 32, 8);
+      ctx.fill();
+
+      // Rear Giant Tires
+      ctx.fillStyle = '#1c1917';
+      // Left rear tire
+      ctx.beginPath();
+      ctx.roundRect(-18, -19, 16, 9, 3);
+      ctx.fill();
+      // Right rear tire
+      ctx.beginPath();
+      ctx.roundRect(-18, 10, 16, 9, 3);
+      ctx.fill();
+
+      // Tire treads pattern
+      ctx.strokeStyle = '#44403c';
+      ctx.lineWidth = 1.5;
+      for (let i = -16; i < -4; i += 3.5) {
+        ctx.beginPath();
+        ctx.moveTo(i, -19);
+        ctx.lineTo(i + 2, -10);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(i, 10);
+        ctx.lineTo(i + 2, 19);
+        ctx.stroke();
+      }
+
+      // Front Steerable Wheels
+      ctx.save();
+      ctx.translate(14, -13);
+      ctx.rotate(tractor.steerAngle);
+      ctx.fillStyle = '#292524';
+      ctx.fillRect(-6, -3, 12, 6);
+      ctx.restore();
+
+      ctx.save();
+      ctx.translate(14, 13);
+      ctx.rotate(tractor.steerAngle);
+      ctx.fillStyle = '#292524';
+      ctx.fillRect(-6, -3, 12, 6);
+      ctx.restore();
+
+      // Tractor Main Body (Classic John Deere Green / Rustic Farm Green)
+      ctx.fillStyle = '#15803d';
+      ctx.beginPath();
+      ctx.roundRect(-14, -10, 30, 20, 4);
+      ctx.fill();
+
+      // Engine Hood (Tapered front)
+      ctx.fillStyle = '#16a34a';
+      ctx.beginPath();
+      ctx.roundRect(4, -8, 15, 16, 3);
+      ctx.fill();
+
+      // Yellow racing farm stripes
+      ctx.fillStyle = '#eab308';
+      ctx.fillRect(5, -2, 14, 4);
+
+      // Glass Cabin / Roof
+      ctx.fillStyle = '#0284c7';
+      ctx.beginPath();
+      ctx.roundRect(-10, -7, 12, 14, 3);
+      ctx.fill();
+      // Cabin highlight
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.fillRect(-8, -5, 4, 10);
+
+      // Vertical Chrome Exhaust Pipe
+      ctx.fillStyle = '#171717';
+      ctx.beginPath();
+      ctx.arc(6, -7, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Front Headlights
+      ctx.fillStyle = '#fef08a';
+      ctx.beginPath();
+      ctx.arc(19, -5, 2, 0, Math.PI * 2);
+      ctx.arc(19, 5, 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Cutting Header Bar in front (Shows mower width)
+      const cutterSpan = tractor.cutWidth === 3 ? 46 : 22;
+      ctx.fillStyle = '#b45309';
+      ctx.fillRect(19, -cutterSpan / 2, 5, cutterSpan);
+
+      // Rotating blades teeth on cutter
+      ctx.fillStyle = '#d97706';
+      for (let y = -cutterSpan / 2; y <= cutterSpan / 2 - 4; y += 5) {
+        ctx.fillRect(23, y, 3, 2);
+      }
+
+      ctx.restore();
+    }
+
+    function drawWalker() {
+      ctx.save();
+      ctx.translate(walker.x, walker.y);
+      ctx.rotate(walker.angle);
+
+      // Shadow
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 10, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Blue Overalls / Denim body
+      ctx.fillStyle = '#0284c7';
+      ctx.beginPath();
+      ctx.arc(0, 0, 8, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Straw Farmer Hat
+      ctx.fillStyle = '#eab308';
+      ctx.beginPath();
+      ctx.arc(0, 0, 11, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Hat ribbon
+      ctx.strokeStyle = '#b91c1c';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, 8, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Hands swinging
+      const handOffset = Math.sin(walker.stepCycle) * 4;
+      ctx.fillStyle = '#fed7aa';
+      ctx.beginPath();
+      ctx.arc(6, 7 + handOffset, 2.5, 0, Math.PI * 2);
+      ctx.arc(6, -7 - handOffset, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    function renderMinimap() {
+      miniCtx.clearRect(0, 0, minimapCanvas.width, minimapCanvas.height);
+      const scaleX = minimapCanvas.width / GRID_COLS;
+      const scaleY = minimapCanvas.height / GRID_ROWS;
+
+      // Draw Field tiles on minimap
+      for (let r = 0; r < GRID_ROWS; r++) {
+        for (let c = 0; c < GRID_COLS; c++) {
+          const idx = r * GRID_COLS + c;
+          if (field[idx] === 1) {
+            miniCtx.fillStyle = '#4d7c0f'; // Green corn
+          } else {
+            miniCtx.fillStyle = '#a16207'; // Carved soil
+          }
+          miniCtx.fillRect(c * scaleX, r * scaleY, Math.ceil(scaleX), Math.ceil(scaleY));
+        }
+      }
+
+      // Draw Entrance / Exit markers
+      miniCtx.fillStyle = '#10b981';
+      miniCtx.fillRect(mazeEntrance.c * scaleX - 1, mazeEntrance.r * scaleY - 1, 4, 4);
+
+      miniCtx.fillStyle = '#ef4444';
+      miniCtx.fillRect(mazeExit.c * scaleX - 1, mazeExit.r * scaleY - 1, 4, 4);
+
+      // Draw Tractor Position (Yellow dot)
+      const dotX = (tractor.x / WORLD_WIDTH) * minimapCanvas.width;
+      const dotY = (tractor.y / WORLD_HEIGHT) * minimapCanvas.height;
+      miniCtx.fillStyle = '#ffffff';
+      miniCtx.beginPath();
+      miniCtx.arc(dotX, dotY, 3.5, 0, Math.PI * 2);
+      miniCtx.fill();
+      miniCtx.fillStyle = '#f59e0b';
+      miniCtx.beginPath();
+      miniCtx.arc(dotX, dotY, 2.5, 0, Math.PI * 2);
+      miniCtx.fill();
+
+      // If walker mode, show blue dot
+      if (gameMode === 'walker') {
+        const wX = (walker.x / WORLD_WIDTH) * minimapCanvas.width;
+        const wY = (walker.y / WORLD_HEIGHT) * minimapCanvas.height;
+        miniCtx.fillStyle = '#38bdf8';
+        miniCtx.beginPath();
+        miniCtx.arc(wX, wY, 3, 0, Math.PI * 2);
+        miniCtx.fill();
+      }
+    }
+
+    /* ==========================================================================
+       10. MODE SWITCHING & UI LOGIC
+       ========================================================================= */
+    function toggleMode(targetMode) {
+      if (targetMode) {
+        gameMode = targetMode;
+      } else {
+        gameMode = gameMode === 'tractor' ? 'walker' : 'tractor';
+      }
+
+      const btnTractor = document.getElementById('btn-mode-tractor');
+      const btnWalker = document.getElementById('btn-mode-walker');
+      const runnerBanner = document.getElementById('runner-banner');
+
+      if (gameMode === 'tractor') {
+        btnTractor.classList.add('active');
+        btnWalker.classList.remove('active');
+        runnerBanner.classList.add('hidden');
+        camera.targetZoom = 1.0;
+        showToast('Tractor Mode: Drive and carve paths!', 'fa-tractor');
+      } else {
+        btnWalker.classList.add('active');
+        btnTractor.classList.remove('active');
+        runnerBanner.classList.remove('hidden');
+
+        // Spawn walker at entrance
+        walker.x = (mazeEntrance.c + 0.5) * TILE_SIZE;
+        walker.y = (mazeEntrance.r + 0.5) * TILE_SIZE;
+        camera.targetZoom = 1.25;
+        showToast('Runner Mode: Find your way to the exit!', 'fa-person-walking');
+      }
+    }
+
+    document.getElementById('btn-mode-tractor').addEventListener('click', () => toggleMode('tractor'));
+    document.getElementById('btn-mode-walker').addEventListener('click', () => toggleMode('walker'));
+    document.getElementById('btn-back-to-tractor').addEventListener('click', () => toggleMode('tractor'));
+
+    // Toggle Mower Width
+    const btnWidth = document.getElementById('btn-cut-width');
+    const widthLabel = document.getElementById('width-label');
+    btnWidth.addEventListener('click', () => {
+      sound.init();
+      tractor.cutWidth = tractor.cutWidth === 1 ? 3 : 1;
+      widthLabel.innerText = `${tractor.cutWidth}x`;
+      showToast(`Mower width set to ${tractor.cutWidth} tile${tractor.cutWidth > 1 ? 's' : ''}!`, 'fa-arrows-left-right-to-line');
+    });
+
+    // Auto-Maze Button
+    document.getElementById('btn-auto-maze').addEventListener('click', () => {
+      sound.init();
+      generateLabyrinthMaze();
+    });
+
+    // Horn Button
+    document.getElementById('btn-horn').addEventListener('click', () => {
+      sound.playHorn();
+      showToast('HONK HONK! 🚜', 'fa-bullhorn');
+    });
+    document.getElementById('btn-touch-horn').addEventListener('click', () => {
+      sound.playHorn();
+    });
+
+    // Audio Toggle
+    const btnAudio = document.getElementById('btn-audio');
+    const audioIcon = document.getElementById('audio-icon');
+    btnAudio.addEventListener('click', () => {
+      sound.init();
+      const on = sound.toggleAudio();
+      audioIcon.className = on ? 'fa-solid fa-volume-high' : 'fa-solid fa-volume-xmark text-red-400';
+      showToast(on ? 'Sound Enabled 🌾' : 'Sound Muted', on ? 'fa-volume-high' : 'fa-volume-xmark');
+    });
+
+    // Replant Button
+    document.getElementById('btn-replant').addEventListener('click', () => {
+      sound.init();
+      initField(true);
+      bushelsHarvested = 0;
+      showToast('Fresh seeds planted! All corn restored.', 'fa-seedling');
+    });
+
+    // Clear All Button
+    document.getElementById('btn-clear-all').addEventListener('click', () => {
+      sound.init();
+      initField(false);
+      showToast('All corn harvested! Clear canvas field.', 'fa-tractor');
+    });
+
+    // Zoom Overview toggle
+    let isZoomedOut = false;
+    document.getElementById('btn-zoom-toggle').addEventListener('click', () => {
+      isZoomedOut = !isZoomedOut;
+      camera.targetZoom = isZoomedOut ? 0.38 : 1.0;
+      showToast(isZoomedOut ? "Bird's-Eye View 🦅" : 'Normal Driving View', 'fa-magnifying-glass');
+    });
+
+    // Export Canvas Image / Snapshot
+    document.getElementById('btn-export').addEventListener('click', () => {
+      sound.init();
+      // Render full bird's eye view to offscreen canvas
+      const exportCanvas = document.createElement('canvas');
+      exportCanvas.width = WORLD_WIDTH;
+      exportCanvas.height = WORLD_HEIGHT;
+      const expCtx = exportCanvas.getContext('2d');
+
+      // Draw full background soil
+      expCtx.fillStyle = '#4a2c11';
+      expCtx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+
+      // Draw tiles
+      for (let r = 0; r < GRID_ROWS; r++) {
+        for (let c = 0; c < GRID_COLS; c++) {
+          const idx = r * GRID_COLS + c;
+          const x = c * TILE_SIZE;
+          const y = r * TILE_SIZE;
+          if (field[idx] === 1) {
+            expCtx.fillStyle = '#4d7c0f';
+            expCtx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+            expCtx.fillStyle = '#65a30d';
+            expCtx.beginPath();
+            expCtx.arc(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE * 0.35, 0, Math.PI * 2);
+            expCtx.fill();
+          } else {
+            expCtx.fillStyle = '#5c3818';
+            expCtx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+          }
+        }
+      }
+
+      // Title watermark
+      expCtx.font = 'bold 36px Fredoka, sans-serif';
+      expCtx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      expCtx.fillText('Cornfield Carver Artwork', 40, WORLD_HEIGHT - 40);
+
+      // Download link
+      const link = document.createElement('a');
+      link.download = `corn-maze-design-${Date.now()}.png`;
+      link.href = exportCanvas.toDataURL('image/png');
+      link.click();
+      showToast('Artwork PNG Snapshot saved to Downloads! 📸', 'fa-camera');
+    });
+
+    // Help Modal
+    const helpModal = document.getElementById('help-modal');
+    document.getElementById('btn-help').addEventListener('click', () => {
+      helpModal.classList.remove('hidden');
+    });
+    document.getElementById('btn-close-help').addEventListener('click', () => {
+      helpModal.classList.add('hidden');
+    });
+    document.getElementById('btn-got-it').addEventListener('click', () => {
+      helpModal.classList.add('hidden');
+      sound.init();
+    });
+
+    /* ==========================================================================
+       11. MAIN GAME LOOP
+       ========================================================================== */
+    function gameLoop() {
+      if (gameMode === 'tractor') {
+        updateTractor();
+      } else {
+        updateWalker();
+      }
+
+      updateCamera();
+      updateParticles();
+      renderWorld();
+      updateStatsHUD();
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    // Startup initialization
+    window.onload = function () {
+      initField(true);
+      initialCornTotal = countCorn();
+      resizeCanvas();
+      showToast('Welcome to Cornfield Carver! Drive around and carve corn!', 'fa-tractor');
+      gameLoop();
+    };
+  </script>
+</body>
+</html>
