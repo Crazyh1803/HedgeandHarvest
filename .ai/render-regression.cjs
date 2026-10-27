@@ -1,7 +1,9 @@
 const assert = require('node:assert/strict');
 const { pathToFileURL } = require('node:url');
 const path = require('node:path');
-const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+let chromium;
+try { ({ chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright')); }
+catch { throw new Error('Browser checks require Playwright. Install it or set PLAYWRIGHT_MODULE to its module directory; see README.md.'); }
 require('node:fs').mkdirSync('.ai/previews', { recursive: true });
 
 (async () => {
@@ -14,14 +16,22 @@ require('node:fs').mkdirSync('.ai/previews', { recursive: true });
       window.__canvasResets = 0;
       for (const key of ['width', 'height']) {
         const d = Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, key);
-        Object.defineProperty(HTMLCanvasElement.prototype, key, {
-          ...d, set(value) { if (this.id === 'field') window.__canvasResets++; d.set.call(this, value); }
-        });
+        Object.defineProperty(HTMLCanvasElement.prototype, key, { ...d, set(value) {
+          if (this.id === 'field') window.__canvasResets++;
+          d.set.call(this, value);
+          if (this.id === 'field' && window.__watchResize) queueMicrotask(() => {
+            const g = this.getContext('2d');
+            const points = [[0.25, 0.25], [0.5, 0.5], [0.75, 0.75]];
+            if (points.every(([x, y]) => g.getImageData(Math.floor(x * this.width), Math.floor(y * this.height), 1, 1).data[3] === 0)) window.__blankResizes++;
+          });
+        } });
       }
     });
     await page.goto(pathToFileURL(path.resolve('index.html')).href);
     await page.locator('#modal-help button[data-close]').click();
     await page.waitForTimeout(1000);
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await page.evaluate(() => { window.__watchResize = true; window.__blankResizes = 0; });
     assert.equal(await page.evaluate(() => window.__cornfield.state().purpose), 'art');
     const sample = () => page.evaluate(() => ({
       pixels: document.getElementById('field').toDataURL(),
@@ -47,15 +57,16 @@ require('node:fs').mkdirSync('.ai/previews', { recursive: true });
     assert.deepEqual((await sample()).view, before.view, 'overview must not follow a moving tractor');
     for (const viewport of [{ width: 390, height: 844 }, { width: 768, height: 600 }, { width: 1440, height: 960 }]) {
       await page.setViewportSize(viewport);
-      await page.waitForTimeout(250);
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       assert.match(await page.locator('#btn-view').innerText(), /Whole field|Overview/i);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       const a = await sample();
       await page.waitForTimeout(300);
       assert.deepEqual((await sample()).view, a.view, 'resize must settle without camera drift');
+      assert.equal(await page.evaluate(() => window.__blankResizes), 0, 'real resize callback must redraw before yielding');
       await page.screenshot({ path: `.ai/previews/art-${viewport.width}.png`, fullPage: true });
     }
     assert.deepEqual(errors, []);
     console.log('Render PASS: art default, identical idle pixels, no idle backing-store clears, no same-size resize flash, fixed overview while driving, stable responsive views.');
   } finally { await browser.close(); }
-})().catch(e => { console.error(e); process.exitCode = 1; });
+})().catch(e => { console.error('Render checks failed (Edge required by default; set BROWSER_CHANNEL for another installed browser).', e); process.exitCode = 1; });

@@ -26,6 +26,8 @@ The browser keeps a local save when browser storage is available. Export a maze 
 
 Run `ak-test` (configured in `.agent.env`) for the Node core tests. No package installation is required.
 
+For browser checks, install Playwright or set `PLAYWRIGHT_MODULE` to an existing Playwright module directory. Set `BROWSER_TESTS=1`, then run `ak-test` to include the interaction and render regression suites. They use installed Microsoft Edge by default; set `BROWSER_CHANNEL=chrome` for installed Chrome. PowerShell example: `$env:BROWSER_TESTS='1'; ak-test`. Screenshots are saved in `.ai/previews/`. The browser suite checks idle pixels, camera stability, resize clearing, sharing, input, and audio controls; the default core suite needs neither Playwright nor a browser.
+
 Procedural canvas graphics keep the current version small and offline. A fixed oblique toy view uses shaded volumes, visible corn stalks and ears, and grounded shadows for depth. These are 2.5D drawings; the game does not yet use a real 3D engine or model pipeline.
 
 The game model and map format are separate from rendering and browser input. Future mobile/PC work can retain the data model while adding a native renderer, packaging, performance tuning, and platform controls. The current release focuses on corn; future crops should be versioned additions to the map schema.
