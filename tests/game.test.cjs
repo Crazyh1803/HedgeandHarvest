@@ -106,7 +106,7 @@ test('import never copies unknown fields and sanitises names', () => {
 });
 
 test('runner collides with corn and board edge, and wins at the exit', () => {
-  const s = C.newBlank({ size: 'small', season: 'summer', animal: 'pig', seed: 0, name: 'x' });
+  const s = C.newBlank({ purpose: 'maze', size: 'small', season: 'summer', animal: 'pig', seed: 0, name: 'x' });
   // fully planted: start has corn on every side but the edge
   assert.deepEqual(C.moveRunner(s, 1, 0), { moved: false, blocked: true, won: false });
   assert.deepEqual(C.moveRunner(s, -1, 0), { moved: false, blocked: true, won: false });
@@ -137,7 +137,7 @@ test('runTo slides toward a target and stops at corn', () => {
 });
 
 test('tractor carves corn, stays inside the field and undo restores everything', () => {
-  const s = C.newBlank({ size: 'small', season: 'autumn', animal: 'cow', seed: 0, name: 'x' });
+  const s = C.newBlank({ purpose: 'maze', size: 'small', season: 'autumn', animal: 'cow', seed: 0, name: 'x' });
   const before = Array.from(s.grid);
   assert.equal(C.moveTractor(s, -1, 0).moved, false);
   assert.equal(s.tractor.dir, 2);
@@ -156,7 +156,7 @@ test('tractor carves corn, stays inside the field and undo restores everything',
 });
 
 test('undo of a carve under the runner returns the runner to the start', () => {
-  const s = C.newBlank({ size: 'small', season: 'autumn', animal: 'cow', seed: 0, name: 'x' });
+  const s = C.newBlank({ purpose: 'maze', size: 'small', season: 'autumn', animal: 'cow', seed: 0, name: 'x' });
   C.moveTractor(s, 1, 0);
   assert.ok(C.moveRunner(s, 1, 0).moved);
   C.undo(s);
@@ -164,7 +164,7 @@ test('undo of a carve under the runner returns the runner to the start', () => {
 });
 
 test('strokes coalesce into one undo step and carveTo drives the tractor', () => {
-  const s = C.newBlank({ size: 'medium', season: 'summer', animal: 'dog', seed: 0, name: 'x' });
+  const s = C.newBlank({ purpose: 'maze', size: 'medium', season: 'summer', animal: 'dog', seed: 0, name: 'x' });
   C.beginStroke(s);
   const r = C.carveTo(s, 5, s.start.y + 3);
   C.endStroke(s);
@@ -178,7 +178,7 @@ test('strokes coalesce into one undo step and carveTo drives the tractor', () =>
 });
 
 test('undo history is bounded', () => {
-  const s = C.newBlank({ size: 'large', season: 'summer', animal: 'dog', seed: 0, name: 'x' });
+  const s = C.newBlank({ purpose: 'maze', size: 'large', season: 'summer', animal: 'dog', seed: 0, name: 'x' });
   for (let i = 0; i < C.MAX_UNDO + 60; i++) {
     C.regenerate(s, i);
   }
@@ -236,4 +236,130 @@ test('all animals and seasons are accepted by the import validator', () => {
     assert.ok(C.parse(C.stringify(s)).ok);
   }
   assert.equal(C.ANIMALS.length, 6);
+});
+
+const art = (size = 'small') => C.newBlank({ size, season: 'summer', animal: 'dog', seed: 0, name: 'art' });
+
+test('art is the default: fully planted but the tractor footprint, no gates, no runner', () => {
+  const s = art();
+  assert.equal(s.purpose, 'art');
+  assert.equal(s.start, null); assert.equal(s.exit, null);
+  assert.equal(C.counts(s).cleared, 1);
+  assert.equal(s.grid[s.tractor.y * s.w + s.tractor.x], 0);
+  assert.equal(C.isConfigured(s), false);
+  assert.equal(C.isSolvable(s), false);
+  assert.equal(C.findPath(s, s.tractor.x, s.tractor.y), null);
+  assert.equal(C.runTo(s, 3, 3, 5), 0);
+  assert.equal(C.moveRunner(s, 1, 0).moved, false);
+  assert.equal(C.regenerate(s, 5), false, 'generation is maze-only');
+  assert.equal(C.counts(s).cleared, 1);
+});
+
+test('toggling art and maze never touches the grid or history', () => {
+  const s = art();
+  C.moveTractor(s, 1, 0); C.moveTractor(s, 0, 1);
+  const grid = Array.from(s.grid), hist = s.history.length, tr = { ...s.tractor };
+  assert.ok(C.setPurpose(s, 'maze'));
+  assert.equal(s.purpose, 'maze');
+  assert.deepEqual(Array.from(s.grid), grid);
+  assert.equal(s.history.length, hist);
+  assert.equal(C.setPurpose(s, 'maze'), false);
+  assert.equal(C.setPurpose(s, 'bogus'), false);
+  assert.ok(C.setPurpose(s, 'art'));
+  assert.deepEqual(Array.from(s.grid), grid);
+  assert.deepEqual({ ...s.tractor }, tr);
+  C.undo(s); C.undo(s);
+  assert.equal(s.purpose, 'art', 'undo never flips the purpose');
+});
+
+test('gate placement validates, carves, is undoable and never moves the tractor', () => {
+  const s = art(); C.setPurpose(s, 'maze');
+  const tr = { ...s.tractor };
+  assert.equal(C.placeGate(s, 'start', -1, 0).ok, false);
+  assert.equal(C.placeGate(s, 'start', s.w, 0).ok, false);
+  assert.equal(C.placeGate(s, 'start', 1.5, 0).ok, false);
+  assert.equal(C.placeGate(s, 'middle', 2, 2).ok, false);
+  assert.equal(s.history.length, 0);
+  assert.equal(C.placeGate(s, 'start', 4, 3).ok, true);
+  assert.equal(s.grid[3 * s.w + 4], 0, 'gate cell is cleared');
+  assert.equal(C.isConfigured(s), false, 'one gate is not enough');
+  assert.equal(C.placeGate(s, 'exit', 4, 3).ok, false, 'distinct cells');
+  assert.equal(C.placeGate(s, 'exit', 9, 8).ok, true);
+  assert.ok(C.isConfigured(s));
+  assert.equal(s.history.length, 2);
+  assert.deepEqual({ ...s.tractor }, tr, 'moving gates does not teleport the tractor');
+  assert.equal(C.placeGate(s, 'start', 4, 4).ok, true);
+  assert.deepEqual({ ...s.tractor }, tr);
+  C.undo(s);
+  assert.deepEqual(s.start, { x: 4, y: 3 });
+  assert.equal(s.grid[4 * s.w + 4], 1, 'undo re-plants the carved gate cell');
+  C.undo(s); C.undo(s);
+  assert.equal(s.start, null); assert.equal(s.exit, null);
+  assert.equal(s.grid[3 * s.w + 4], 1);
+  assert.equal(C.counts(s).cleared, 1);
+  assert.equal(C.placeGate(art(), 'start', 2, 2).ok, false, 'art purpose cannot place gates');
+});
+
+test('a configured run works end to end; incomplete gates block it', () => {
+  const s = art(); C.setPurpose(s, 'maze');
+  C.placeGate(s, 'start', 2, 5);
+  assert.equal(C.moveRunner(s, 1, 0).moved, false, 'no runner with one gate');
+  C.placeGate(s, 'exit', 6, 5);
+  assert.equal(C.isSolvable(s), false, 'corn between the gates');
+  assert.equal(C.moveRunner(s, 1, 0).blocked, true);
+  for (let x = 3; x <= 5; x++) s.grid[5 * s.w + x] = 0;
+  assert.ok(C.isSolvable(s));
+  assert.equal(C.runTo(s, 6, 5, 10), 4);
+  assert.ok(s.run.won);
+});
+
+test('v2 round trip keeps purpose, partial gates and art', () => {
+  const s = art('medium'); C.moveTractor(s, 1, 0); C.moveTractor(s, 1, 0);
+  let r = C.parse(C.stringify(s, { tractor: true }));
+  assert.ok(r.ok, r.error);
+  assert.equal(r.state.purpose, 'art'); assert.equal(r.state.start, null); assert.equal(r.state.exit, null);
+  assert.deepEqual(Array.from(r.state.grid), Array.from(s.grid));
+  assert.deepEqual([r.state.tractor.x, r.state.tractor.y], [2, s.tractor.y]);
+  assert.equal(JSON.parse(C.stringify(s)).version, 2);
+  assert.equal('start' in JSON.parse(C.stringify(s)), false);
+  r = C.parse(C.stringify(s));
+  assert.ok(r.ok);
+  assert.equal(r.state.grid[r.state.tractor.y * r.state.w + r.state.tractor.x], 0, 'tractor parked on a cleared cell');
+  C.setPurpose(s, 'maze'); C.placeGate(s, 'start', 5, 5);
+  r = C.parse(C.stringify(s, { tractor: true }));
+  assert.ok(r.ok, r.error);
+  assert.equal(r.state.purpose, 'maze');
+  assert.deepEqual(r.state.start, { x: 5, y: 5 }); assert.equal(r.state.exit, null);
+  assert.equal(C.isConfigured(r.state), false);
+  const o = JSON.parse(C.stringify(s)); o.start = [0, 0];
+  assert.equal(C.parse(JSON.stringify(o)).ok, false, 'start in corn');
+  o.start = [5, 5]; o.exit = [5, 5];
+  assert.equal(C.parse(JSON.stringify(o)).ok, false, 'same gates');
+  o.exit = [999, 1];
+  assert.equal(C.parse(JSON.stringify(o)).ok, false, 'exit out of bounds');
+  const p = JSON.parse(C.stringify(s)); p.purpose = 'zoo';
+  assert.equal(C.parse(JSON.stringify(p)).ok, false, 'unknown purpose');
+});
+
+test('version 1 saves migrate as mazes and need both gates', () => {
+  const m = mk('small', 'spring', 9);
+  const o = C.serialize(m); o.version = 1; delete o.purpose;
+  const r = C.parse(JSON.stringify(o));
+  assert.ok(r.ok, r.error);
+  assert.equal(r.state.purpose, 'maze');
+  assert.deepEqual(r.state.start, m.start); assert.deepEqual(r.state.exit, m.exit);
+  assert.deepEqual([r.state.tractor.x, r.state.tractor.y], [m.start.x, m.start.y]);
+  assert.deepEqual(Array.from(r.state.grid), Array.from(m.grid));
+  assert.ok(C.isSolvable(r.state));
+  const noGate = JSON.parse(JSON.stringify(o)); delete noGate.start;
+  assert.equal(C.parse(JSON.stringify(noGate)).ok, false, 'v1 requires gates');
+});
+
+test('replant keeps the tractor in place and is undoable', () => {
+  const s = art(); C.moveTractor(s, 1, 0); C.moveTractor(s, 1, 0);
+  C.replant(s);
+  assert.deepEqual([s.tractor.x, s.tractor.y], [2, s.tractor.y]);
+  assert.equal(C.counts(s).cleared, 1);
+  C.undo(s);
+  assert.equal(C.counts(s).cleared, 3);
 });
