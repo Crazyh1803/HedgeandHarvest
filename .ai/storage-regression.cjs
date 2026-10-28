@@ -13,26 +13,33 @@ const C = require('../game.js');
     const legacy = C.serialize(C.newMaze({ size: 'small', season: 'autumn', animal: 'cat', seed: 42, name: 'Legacy orchard' }));
     legacy.version = 1; delete legacy.purpose;
     const unreadable = '{"format":"cornfield-carver","version":99}';
-    for (const [raw, valid, failBackup] of [[JSON.stringify(legacy), true, false], [unreadable, false, false], [unreadable, false, true]]) {
+    for (const [raw, valid, failBackup, failCheckpoint] of [[JSON.stringify(legacy), true, false, false], [JSON.stringify(legacy), true, false, true], [unreadable, false, false, false], [unreadable, false, true, false]]) {
       const context = await browser.newContext();
       const page = await context.newPage();
-      await page.addInitScript(({ raw, failBackup }) => {
+      await page.addInitScript(({ raw, failBackup, failCheckpoint }) => {
         localStorage.setItem('cornfield-carver:v1', raw);
         localStorage.setItem('cornfield-carver:seen', '1');
-        if (failBackup) {
+        if (failBackup || failCheckpoint) {
           const native = Storage.prototype.setItem;
           Storage.prototype.setItem = function (key, value) {
-            if (key === 'cornfield-carver:backup') throw new DOMException('Quota full', 'QuotaExceededError');
+            if ((failBackup && key === 'cornfield-carver:backup') || (failCheckpoint && key !== 'cornfield-carver:v1' && value === raw)) throw new DOMException('Quota full', 'QuotaExceededError');
             return native.call(this, key, value);
           };
         }
-      }, { raw, failBackup });
+      }, { raw, failBackup, failCheckpoint });
       await page.goto(url);
       await page.waitForFunction(() => !!window.__cornfield);
       assert.equal(await page.evaluate(() => window.__cornfield.state().purpose), 'art');
       assert.ok(await page.evaluate(() => window.__cornfield.core.counts(window.__cornfield.state()).cleared <= 1), 'all loads must start with a planted field');
       await page.waitForTimeout(450);
       assert.equal(await page.evaluate(() => localStorage.getItem('cornfield-carver:v1')), raw, 'startup must not replace the existing saved field');
+      if (failCheckpoint) {
+        await page.locator('#field').focus(); await page.keyboard.press('ArrowRight');
+        await page.waitForTimeout(600);
+        assert.equal(await page.evaluate(() => localStorage.getItem('cornfield-carver:v1')), raw, 'failed checkpoint must preserve the older saved work');
+        assert.match(await page.locator('#save-status').innerText(), /paused|unavailable/i);
+        await context.close(); continue;
+      }
       if (valid) {
         await page.locator('#tab-settings').click();
         await page.locator('button[data-season="spring"]').click();
