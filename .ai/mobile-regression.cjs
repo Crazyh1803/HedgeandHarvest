@@ -1,3 +1,4 @@
+const { clickControl } = require('./browser-controls.cjs');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
@@ -44,9 +45,9 @@ catch { throw new Error('Mobile checks require Playwright; set PLAYWRIGHT_MODULE
       const c = window.__cornfield.core, o = c.serialize(c.newMaze({ size: 'medium', season: 'summer', animal: 'dog', seed: 42, name: 'Mobile compass' }));
       o.rows = o.rows.map(row => '.'.repeat(row.length)); o.start = [5, 8]; o.exit = [20, 14]; o.tractor = [0, 8]; return JSON.stringify(o);
     });
-    await page.locator('#btn-import').click(); await page.locator('#import-text').fill(creation); await page.locator('#import-load').click();
+    await clickControl(page, '#btn-import'); await page.locator('#import-text').fill(creation); await page.locator('#import-load').click();
     if (await page.locator('#modal-confirm').isVisible()) await page.locator('#confirm-ok').click();
-    await page.locator('#mode-run').click();
+    await clickControl(page, '#mode-run');
     await fourDirections();
     const beforeDrag = await actor();
     await page.locator('#field').scrollIntoViewIfNeeded();
@@ -75,3 +76,4 @@ catch { throw new Error('Mobile checks require Playwright; set PLAYWRIGHT_MODULE
     console.log('Mobile PASS: native touch directions, holds/releases/cancel, close-up, runner, downward drag, portrait reachability, landscape and outside-canvas scrolling.');
   } finally { await context.close(); await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
+

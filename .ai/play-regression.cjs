@@ -1,3 +1,4 @@
+const { clickControl } = require('./browser-controls.cjs');
 const assert = require('node:assert/strict');
 const { pathToFileURL } = require('node:url');
 const path = require('node:path');
@@ -72,12 +73,12 @@ require('node:fs').mkdirSync('.ai/previews', { recursive: true });
       o.rows[7] = '.#' + '.'.repeat(o.width - 2);
       return JSON.stringify(o);
     });
-    await page.locator('#btn-import').click(); await page.locator('#import-text').fill(creation); await page.locator('#import-load').click();
+    await clickControl(page, '#btn-import'); await page.locator('#import-text').fill(creation); await page.locator('#import-load').click();
     if (await page.locator('#modal-confirm').isVisible()) await page.locator('#confirm-ok').click();
-    await page.locator('#mode-run').click();
+    await clickControl(page, '#mode-run');
     for (const animal of ['dog', 'cat', 'cow', 'horse', 'pig', 'chicken']) {
       await page.locator('#tab-settings').click(); await page.locator(`[data-animal="${animal}"]`).click(); await page.locator('#tab-play').click();
-      await page.locator('#btn-reset').click(); await page.locator('#field').focus();
+      await clickControl(page, '#btn-reset'); await page.locator('#field').focus();
       await page.keyboard.press('ArrowUp');
       assert.equal(await page.evaluate(() => window.__cornfield.animation().moving), false, 'blocked input cannot start a gait');
       await page.keyboard.down('ArrowRight');
@@ -103,10 +104,11 @@ require('node:fs').mkdirSync('.ai/previews', { recursive: true });
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.reload();
     await page.locator('#btn-resume').click();
-    await page.locator('#tab-play').click(); await page.locator('#mode-run').click();
+    await page.locator('#tab-play').click(); await clickControl(page, '#mode-run');
     await page.locator('#field').focus(); await page.keyboard.down('ArrowRight'); await page.waitForTimeout(250); await page.keyboard.up('ArrowRight');
     assert.equal(await page.evaluate(() => window.__cornfield.animation().amount), 0, 'reduced motion must keep the gait neutral');
     assert.deepEqual(errors, []);
     console.log('Play PASS: accessible settings tabs, input isolation, close-up minimap, six movement-driven gaits, static idle/blocked poses, responsive layout and reduced motion.');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
+

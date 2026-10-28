@@ -1,3 +1,4 @@
+const { clickControl } = require('./browser-controls.cjs');
 const assert = require('node:assert/strict');
 const { pathToFileURL } = require('node:url');
 const path = require('node:path');
@@ -105,3 +106,4 @@ const C = require('../game.js');
     console.log('Storage PASS: planted startup/explicit Continue, legacy migration, checkpoint quota failure, fresh metadata isolation, latest and first-install carving restoration.');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
+

@@ -1,3 +1,4 @@
+const { clickControl } = require('./browser-controls.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -57,11 +58,11 @@ catch { throw new Error('Polish checks require Playwright; set PLAYWRIGHT_MODULE
     assert.equal(await page.locator('a.support-link[data-placement="main"]').isVisible(), true);
     await page.locator('#tab-settings').click();
     assert.equal(await page.locator('a.support-link[data-placement="settings"]').isVisible(), true);
-    await page.locator('#tab-play').click(); await page.locator('#btn-export-json').click();
+    await page.locator('#tab-play').click(); await clickControl(page, '#btn-export-json');
     assert.equal(await page.locator('#modal-share a.support-link').isVisible(), true);
     await page.locator('#modal-share button[data-close]').click();
     assert.equal(await page.locator('#loaded-support').isVisible(), false);
-    await page.locator('#btn-import').click(); await page.locator('#import-text').fill('{bad'); await page.locator('#import-load').click();
+    await clickControl(page, '#btn-import'); await page.locator('#import-text').fill('{bad'); await page.locator('#import-load').click();
     assert.equal(await page.locator('#loaded-support').isVisible(), false, 'failed imports must not show a successful-load support note');
     const creation = await page.evaluate(() => {
       const C = window.__cornfield.core, o = C.serialize(C.newMaze({ size: 'small', season: 'summer', animal: 'cat', seed: 42, name: 'One happy hedge' }));
@@ -71,7 +72,7 @@ catch { throw new Error('Polish checks require Playwright; set PLAYWRIGHT_MODULE
     if (await page.locator('#modal-confirm').isVisible()) await page.locator('#confirm-ok').click();
     assert.equal(await page.locator('#loaded-support').isVisible(), true);
     assert.equal(await page.locator('a.support-link[data-placement="main"]').isVisible(), false, 'a contextual support note should replace the ambient one, not duplicate it');
-    await page.locator('#mode-run').click(); await page.locator('#field').focus(); await page.keyboard.press('ArrowRight');
+    await clickControl(page, '#mode-run'); await page.locator('#field').focus(); await page.keyboard.press('ArrowRight');
     await page.locator('#win').waitFor({ state: 'visible' });
     assert.equal(await page.locator('#win a.support-link[data-placement="completed"]').isVisible(), true);
     await page.locator('#win-again').click();
@@ -100,3 +101,4 @@ catch { throw new Error('Polish checks require Playwright; set PLAYWRIGHT_MODULE
     console.log('Polish PASS: rebrand/favicon, audible top song controls, muted/rapid skips, five optional support placements, successful load/win flow and four-direction animal renders.');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
+
