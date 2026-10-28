@@ -42,13 +42,14 @@
           <div class="stat route maze-only" data-ok="0"><span class="label">Route</span><b id="hud-route">Place gates</b></div>
         </div>
         <button id="btn-maze" class="btn tog" type="button" aria-pressed="false">Make it a maze</button>
-        <div class="mode-switch maze-only" id="mode-group" role="group" aria-label="Mode">
-          <button id="mode-carve" data-mode="carve" type="button" aria-pressed="true">Carve</button>
-          <button id="mode-run" data-mode="run" type="button" aria-pressed="false" disabled>Run</button>
-        </div>
         <details id="maze-menu" class="menu maze-only">
           <summary id="maze-summary" class="btn">Maze options</summary>
-          <div class="menu-panel menu-left">
+          <div class="menu-panel menu-left" id="maze-panel">
+            <div class="mode-switch" id="mode-group" role="group" aria-label="Mode">
+              <button id="mode-carve" data-mode="carve" type="button" aria-pressed="true">Carve</button>
+              <button id="mode-run" data-mode="run" type="button" aria-pressed="false" disabled>Run</button>
+            </div>
+            <p class="gate-status" id="gate-status" role="status">Start not placed. Exit not placed. Place both to run.</p>
             <button id="btn-place-start" class="btn" type="button" aria-pressed="false">Place start</button>
             <button id="btn-place-exit" class="btn" type="button" aria-pressed="false">Place exit</button>
             <button id="btn-generate" class="btn" type="button">Grow new maze</button>
@@ -64,7 +65,6 @@
             <button id="btn-png" class="btn" type="button">Save picture (PNG)</button>
           </div>
         </details>
-        <p class="gate-status maze-only" id="gate-status" role="status">Start not placed. Exit not placed. Place both to run.</p>
       </div>
 
       <div class="canvas-wrap">
@@ -98,7 +98,10 @@
         <button id="btn-undo2" class="btn dpad-undo" type="button">Undo</button>
       </div>
     </section>
-    <p id="field-support" class="note support support-main">Enjoying the game? You can <a class="support-link" data-placement="main" href="https://buymeacoffee.com/AppsbyDan" target="_blank" rel="noopener noreferrer">buy Dan a coffee</a>.</p>
+    <div id="field-support">
+      <p class="note support support-main">Enjoying the game? You can <a class="support-link" data-placement="main" href="https://buymeacoffee.com/AppsbyDan" target="_blank" rel="noopener noreferrer">buy Dan a coffee</a>.</p>
+      <p class="note support" id="loaded-support" hidden>Enjoying the game? You can <a class="support-link" data-placement="loaded" href="https://buymeacoffee.com/AppsbyDan" target="_blank" rel="noopener noreferrer">buy Dan a coffee</a>.</p>
+    </div>
     </div>
 
     <aside class="panel" aria-label="Field settings">
@@ -136,7 +139,6 @@
 
       <section class="card" aria-label="Save status">
         <p class="note" id="save-status">Autosave on</p>
-        <p class="note support" id="loaded-support" hidden>Enjoying the game? You can <a class="support-link" data-placement="loaded" href="https://buymeacoffee.com/AppsbyDan" target="_blank" rel="noopener noreferrer">buy Dan a coffee</a>.</p>
       </section>
       </div>
 

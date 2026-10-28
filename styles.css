@@ -271,7 +271,6 @@ body[data-season="winter"] { --sage-deep: #4e7a96; }
 
 /* field toolbar (top border of the stage) */
 .stage-col { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.stage-col > .support { margin: 0; text-align: center; }
 .card > .note:first-child { margin-top: 0; }
 .field-toolbar { position: relative; z-index: 6; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .field-toolbar .hud { padding-right: 0; margin: 0; }
@@ -293,12 +292,19 @@ body[data-season="winter"] { --sage-deep: #4e7a96; }
 .menu-left { left: 0; }
 .menu-right { right: 0; }
 .menu-panel .btn { width: 100%; min-height: 48px; text-align: center; }
-.field-toolbar .gate-status { flex: 1 1 100%; margin: 0; min-height: 0; font-size: 0.85rem; }
+.menu-panel .mode-switch { align-self: stretch; }
+.menu-panel .mode-switch button { flex: 1; }
+.menu-panel .gate-status { margin: 0; min-height: 0; padding: 0 4px; font-size: 0.85rem; }
 body[data-purpose="maze"] .hud { display: none; }
+#field-support { text-align: center; }
+#field-support .support { margin: 0; }
 .top-actions a.btn { display: inline-flex; align-items: center; text-decoration: none; }
 @media (max-width: 620px) {
-  .field-toolbar { gap: 6px; }
-  .field-toolbar .btn { padding-left: 12px; padding-right: 12px; }
+  .field-toolbar { gap: 6px; flex-wrap: nowrap; }
+  .field-toolbar .btn { padding-left: 9px; padding-right: 9px; font-size: 0.8rem; white-space: nowrap; }
+  .field-toolbar .stat { padding: 4px 7px; }
+  .menu > summary::after { margin-left: 4px; }
   .top-actions .btn { min-height: 48px; }
-  .canvas-wrap { height: min(40svh, calc(100svh - 470px)); min-height: 180px; }
+  .canvas-wrap { height: min(38svh, calc(100svh - 540px)); min-height: 160px; }
+  .dpad { grid-template-rows: repeat(2, 50px); gap: 4px; }
 }

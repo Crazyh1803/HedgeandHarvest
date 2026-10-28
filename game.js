@@ -1355,7 +1355,10 @@
       document.body.setAttribute('data-mode', ui.mode);
       var maze = S.purpose === 'maze', ready = core.isConfigured(S);
       document.body.setAttribute('data-purpose', S.purpose);
-      $('btn-maze').setAttribute('aria-pressed', maze ? 'true' : 'false');
+      var mazeBtn = $('btn-maze'), mazePanel = $('maze-panel');
+      if (maze && mazeBtn.parentNode !== mazePanel) mazePanel.insertBefore(mazeBtn, mazePanel.firstChild);
+      else if (!maze && mazeBtn.parentNode === mazePanel) $('field-toolbar').insertBefore(mazeBtn, $('maze-menu'));
+      mazeBtn.setAttribute('aria-pressed', maze ? 'true' : 'false');
       $('btn-maze').textContent = maze ? 'Back to art' : 'Make it a maze';
       $('mode-run').disabled = !ready;
       $('btn-place-start').setAttribute('aria-pressed', ui.place === 'start' ? 'true' : 'false');
@@ -1486,6 +1489,9 @@
       resetTimer(); syncActors(); ui.hint = null; ui.place = null;
       if (!maze || !core.isConfigured(S)) ui.mode = 'carve';
       scheduleSave(false); updatePanel();
+      var focusEl = $(maze ? 'maze-summary' : 'btn-maze');
+      if (!document.activeElement || document.activeElement === document.body || document.activeElement.id === 'btn-maze' ||
+          document.activeElement.id === 'maze-summary') focusEl.focus();
       say(maze ? 'Maze on. Place a start and an exit anywhere in the field.' : 'Back to art. Your field is untouched.');
     }
     function startPlace(which) {
