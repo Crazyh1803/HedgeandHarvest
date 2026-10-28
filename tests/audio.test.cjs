@@ -4,8 +4,8 @@ const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const fs = require('node:fs');
 
-function harness() {
-  const voices = [], intervals = new Map(), timeouts = [], listeners = {}, storage = new Map();
+function harness(savedPrefs) {
+  const voices = [], intervals = new Map(), timeouts = [], listeners = {}, storage = new Map(savedPrefs || []);
   let context, nextId = 1;
   const param = () => ({ value: 0, setValueAtTime(v) { this.value = v; }, linearRampToValueAtTime(v) { this.value = v; }, exponentialRampToValueAtTime(v) { this.value = v; }, setTargetAtTime(v) { this.value = v; }, cancelScheduledValues() {} });
   const node = () => ({ connect(target) { if (target.frequency) this.filterFrequency = target.frequency.value; return target; }, disconnect() { this.disconnected = true; } });
@@ -28,13 +28,15 @@ function harness() {
   vm.runInNewContext(fs.readFileSync(require.resolve('../audio.js'), 'utf8'), {
     window, document, Math, Float32Array,
     setInterval(fn) { const id = nextId++; intervals.set(id, fn); return id; }, clearInterval(id) { intervals.delete(id); },
-    setTimeout(fn) { timeouts.push(fn); return timeouts.length; }, clearTimeout() {}
+    setTimeout(fn, ms) { fn.at = (context ? context.currentTime : 0) + (ms || 0) / 1000; fn.id = nextId++; timeouts.push(fn); return fn.id; },
+    clearTimeout(id) { const fn = timeouts.find(f => f.id === id); if (fn) fn.canceled = true; }
   });
-  return { audio: window.CornfieldAudio, voices, document, listeners, intervals, timeouts,
+  return { audio: window.CornfieldAudio, voices, document, listeners, intervals, timeouts, storage,
     advance(seconds) {
       context.currentTime += seconds;
       for (const v of voices) if (!v.ended && v.stopAt <= context.currentTime) { v.ended = true; if (v.onended) v.onended(); }
       for (const fn of [...intervals.values()]) fn();
+      for (const fn of timeouts) if (!fn.ran && !fn.canceled && fn.at <= context.currentTime) { fn.ran = true; fn(); }
     }, get ctx() { return context; } };
 }
 
@@ -85,6 +87,56 @@ test('music and effects stay independent and hidden tabs stop the scheduler', ()
   h.document.hidden = false; h.listeners.visibilitychange();
   assert.equal(h.ctx.state, 'running'); assert.ok(h.intervals.size > 0);
   h.audio.setMusic(false); h.audio.setSfx(false);
-  for (const fn of h.timeouts) fn();
+  h.advance(0.6);
   assert.equal(h.ctx.state, 'suspended');
+});
+
+test('five distinct songs include the unchanged original arrangement', () => {
+  const h = harness(), A = h.audio, crypto = require('node:crypto');
+  const ids = Array.from(A.tracks, t => t.id);
+  assert.equal(ids.length, 5); assert.equal(new Set(ids).size, 5);
+  assert.ok(Array.from(A.tracks).every(t => typeof t.title === 'string' && t.title.length && t.bpm > 0));
+  const hash = patterns => crypto.createHash('sha256').update(JSON.stringify(patterns)).digest('hex');
+  const original = Array.from({ length: 32 }, (_, i) => A.patternAt(i));
+  assert.equal(hash(original), '7847573ffd7c7332db8598b8595990639d50d465a5b903436258952aaad4d954', 'keep the current tune exactly as requested');
+  assert.equal(hash(Array.from({ length: 32 }, (_, i) => A.patternAt(i, ids[0]))), hash(original));
+  const arrangements = ids.map(id => Array.from({ length: 32 }, (_, i) => A.patternAt(i, id)));
+  assert.equal(new Set(arrangements.map(hash)).size, 5, 'every song needs its own arrangement');
+  const contours = arrangements.map(pattern => {
+    const lead = pattern.map(events => events.find(e => e.voice === 'lead')?.freq || 0);
+    const base = lead.find(f => f > 0);
+    return JSON.stringify(lead.map(f => f ? Math.round(1200 * Math.log2(f / base)) : null));
+  });
+  assert.equal(new Set(contours).size, 5, 'songs must have distinct melodic contours, not merely pitch-shift the same melody');
+});
+
+test('playlist selection while muted persists without starting audio and rotation wraps', () => {
+  const h = harness(), A = h.audio, ids = Array.from(A.tracks, t => t.id);
+  assert.equal(A.autoRotate(), true);
+  assert.equal(A.rotationSteps, 256);
+  for (let i = 0; i < 6; i++) assert.equal(A.trackAt(i * A.rotationSteps), ids[i % 5]);
+  A.setTrack(ids[2]);
+  assert.equal(A.track(), ids[2]); assert.equal(A.music(), false); assert.equal(h.ctx, undefined);
+  assert.equal(A.trackAt(0), ids[2]); assert.equal(A.trackAt(A.rotationSteps), ids[3]);
+  A.setAutoRotate(false);
+  for (const step of [0, 256, 9999]) assert.equal(A.trackAt(step), ids[2]);
+  const restored = harness([...h.storage.entries()]);
+  assert.equal(restored.audio.track(), ids[2]); assert.equal(restored.audio.autoRotate(), false);
+  assert.equal(restored.ctx, undefined);
+  const previous = A.track(); A.setTrack('not-a-song'); assert.equal(A.track(), previous);
+});
+
+test('rotation advances on the audio timeline and manual changes clean queued voices', () => {
+  const h = harness(), A = h.audio, ids = Array.from(A.tracks, t => t.id);
+  A.setMusic(true);
+  for (let i = 0; i < 660; i++) {
+    h.advance(0.1);
+    assert.ok(h.voices.filter(v => !v.ended).length <= 40, 'playlist rotation must not leak voices');
+  }
+  assert.equal(A.nowPlaying(), ids[1], 'second song should be audible after the 32-bar boundary');
+  const old = h.voices.filter(v => !v.ended && v.startAt > h.ctx.currentTime);
+  A.setTrack(ids[4]); h.advance(0.25);
+  assert.equal(A.nowPlaying(), ids[4]);
+  assert.ok(old.every(v => v.stopAt <= v.startAt || v.ended), 'queued old-track voices must be canceled when selecting a different song');
+  assert.equal(A.sfx(), false);
 });
