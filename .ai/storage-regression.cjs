@@ -17,12 +17,13 @@ const C = require('../game.js');
       const context = await browser.newContext();
       const page = await context.newPage();
       await page.addInitScript(({ raw, failBackup, failCheckpoint }) => {
+        window.__checkpointFailures = 0;
         localStorage.setItem('cornfield-carver:v1', raw);
         localStorage.setItem('cornfield-carver:seen', '1');
         if (failBackup || failCheckpoint) {
           const native = Storage.prototype.setItem;
           Storage.prototype.setItem = function (key, value) {
-            if ((failBackup && key === 'cornfield-carver:backup') || (failCheckpoint && key !== 'cornfield-carver:v1' && value === raw)) throw new DOMException('Quota full', 'QuotaExceededError');
+            if ((failBackup && key === 'cornfield-carver:backup') || (failCheckpoint && key !== 'cornfield-carver:v1' && value === raw)) { window.__checkpointFailures++; throw new DOMException('Quota full', 'QuotaExceededError'); }
             return native.call(this, key, value);
           };
         }
@@ -36,6 +37,7 @@ const C = require('../game.js');
       if (failCheckpoint) {
         await page.locator('#field').focus(); await page.keyboard.press('ArrowRight');
         await page.waitForTimeout(600);
+        assert.ok(await page.evaluate(() => window.__checkpointFailures > 0), 'checkpoint failure injection must actually run');
         assert.equal(await page.evaluate(() => localStorage.getItem('cornfield-carver:v1')), raw, 'failed checkpoint must preserve the older saved work');
         assert.match(await page.locator('#save-status').innerText(), /paused|unavailable/i);
         await context.close(); continue;

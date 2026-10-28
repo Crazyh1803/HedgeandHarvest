@@ -129,7 +129,8 @@ test('playlist selection while muted persists without starting audio and rotatio
 test('rotation advances on the audio timeline and manual changes clean queued voices', () => {
   const h = harness(), A = h.audio, ids = Array.from(A.tracks, t => t.id);
   A.setMusic(true);
-  for (let i = 0; i < 660; i++) {
+  const boundarySeconds = A.rotationSteps * 60 / A.tracks[0].bpm / 2;
+  for (let i = 0; i < Math.ceil((boundarySeconds + 1) / 0.1); i++) {
     h.advance(0.1);
     assert.ok(h.voices.filter(v => !v.ended).length <= 40, 'playlist rotation must not leak voices');
   }

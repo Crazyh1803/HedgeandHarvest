@@ -34,7 +34,7 @@ require('node:fs').mkdirSync('.ai/previews', { recursive: true });
     const view = await page.evaluate(() => window.__cornfield.view());
     const cornBefore = await page.locator('#field').evaluate(c => c.toDataURL());
     const mapBefore = await page.locator('#minimap').evaluate(c => c.toDataURL());
-    await page.waitForTimeout(650);
+    await page.waitForFunction(before => document.getElementById('field').toDataURL() !== before, cornBefore);
     assert.notEqual(await page.locator('#field').evaluate(c => c.toDataURL()), cornBefore, 'happy corn must visibly sway');
     assert.equal(await page.locator('#minimap').evaluate(c => c.toDataURL()), mapBefore, 'sway must not animate or move the minimap');
     assert.deepEqual(await page.evaluate(() => window.__cornfield.view()), view, 'sway must not rock the camera');
