@@ -40,7 +40,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     assert.equal(await page.evaluate(() => document.activeElement.id), 'creation-name', 'outside-click dismissal must retain the clicked focus');
     const png = page.waitForEvent('download'); await clickControl(page, '#btn-png');
     assert.match((await png).suggestedFilename(), /\.png$/);
-    await page.locator('#btn-maze').click();
+    await clickControl(page, '#btn-maze');
     for (const id of ['hud-time', 'hud-moves', 'hud-corn', 'hud-route']) assert.equal(await page.locator('#' + id).isVisible(), false, 'maze mode should replace top stat chips with tools');
     assert.equal(await page.locator('#maze-summary').isVisible(), true);
     assert.equal(await page.locator('#maze-menu #mode-group').count(), 1);
@@ -65,3 +65,4 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     console.log('Toolbar PASS: art/maze border tools, share dropdown exports, keyboard/focus/outside dismissal, victory share, under-field coffee and developer link.');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
+

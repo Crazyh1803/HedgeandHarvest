@@ -36,7 +36,7 @@ require('node:fs').mkdirSync('.ai/previews', { recursive: true });
     await page.locator('#field').focus();
     for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowRight');
     const artGrid = await page.evaluate(() => Array.from(window.__cornfield.state().grid));
-    await page.locator('#btn-maze').click();
+    await clickControl(page, '#btn-maze');
     assert.deepEqual(await page.evaluate(() => Array.from(window.__cornfield.state().grid)), artGrid);
     assert.equal(await page.locator('#mode-run').isEnabled(), false);
     await clickControl(page, '#btn-place-start');
@@ -56,8 +56,8 @@ require('node:fs').mkdirSync('.ai/previews', { recursive: true });
     });
     assert.equal(gates.exit.x - gates.start.x, 3);
     assert.deepEqual(gates.exit, expectedExit, 'pointer gate must land on the intended field cell');
-    await page.locator('#btn-maze').click();
-    await page.locator('#btn-maze').click();
+    await clickControl(page, '#btn-maze');
+    await clickControl(page, '#btn-maze');
     assert.deepEqual(await page.evaluate(() => {
       const s = window.__cornfield.state(); return { start: s.start, exit: s.exit, grid: Array.from(s.grid) };
     }), gates);
@@ -131,4 +131,5 @@ require('node:fs').mkdirSync('.ai/previews', { recursive: true });
     console.log('Browser PASS: rendering, independent audio toggles/context lifecycle, settings, JSON roundtrip/rejection/download, PNG, keyboard maze victory, autosave, touch controls, responsive widths; no page errors.');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
+
 
