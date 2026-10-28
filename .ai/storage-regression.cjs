@@ -42,6 +42,7 @@ const C = require('../game.js');
         await page.waitForTimeout(450);
         assert.equal(await page.evaluate(() => localStorage.getItem('cornfield-carver:v1')), raw, 'preferences and naming a fresh field must not replace the saved carving');
         await page.locator('#btn-resume').click();
+        if (await page.locator('#modal-confirm').isVisible()) await page.locator('#confirm-ok').click();
         const restored = await page.evaluate(() => window.__cornfield.core.serialize(window.__cornfield.state()));
         assert.equal(restored.purpose, 'maze');
         assert.equal(restored.version, 2);
