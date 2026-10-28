@@ -1,0 +1,15 @@
+# Final field toolbar and GitHub push
+
+User requests Share/Export dropdown in the main field top border near the current stats; Make it a maze there as well, with maze controls replacing those data chips in maze mode. Move the primary coffee link directly below the field. Add About the developer beside How to play linking https://appsbydan.com. Then push complete project to https://github.com/Crazyh1803/HedgeandHarvest.
+
+Interpretation: art top border shows corn count + Make it a maze + Share/Export. Maze mode removes the stat chips from that border and exposes maze tools/mode controls and Share/Export, with a clear way back to art. Keep timer/steps internally and in victory stats. Compact controls may use a Maze options disclosure to retain phone reachability.
+
+Split: Claude handles index.html/styles.css/game.js only, existing IDs preserved (single instances). Codex adapts independent browser suites and adds toolbar-focused keyboard/mobile tests, updates README, integrates/reviews, and pushes via git. No game-model, rendering, audio or save changes.
+
+Share dropdown: native details/summary or equivalent accessible disclosure, buttons for Export JSON, Import JSON, Save PNG; Escape and outside click close, selecting closes before modal; focus returns to the visible summary, never a hidden menu button. Opening menus stops held movement; keyboard input while using menu must not move tractor/runner. Maze controls keep all existing actions/gate status. Avoid clipping dropdowns in the canvas and preserve touch hit targets/375x667 reachability.
+
+Coffee link: main optional support under field/maze stage, not sidebar. Preserve settings/contextual load/share/victory placements, avoid duplicate ambient vs loaded note. About developer is an honest external anchor, target blank + noopener noreferrer, visually beside help (not an in-app settings panel).
+
+Repository: current project has no remote; origin configured to requested URL. GitHub connection and git ls-remote confirm repository exists, public, empty, default branch main, and push permission. User explicitly authorized final push; all local work remains on codex feature branch, no force pushes. After tests/review and final commit, push HEAD to remote main (initialization; no remote history to replace), verify remote SHA equals HEAD and report repository link. No hosting deployment requested. Preserve existing local commit history and project workflow records.
+
+Verification: ak-test full Node+7 browser suites, add toolbar suite for art/maze visibility, share/dropdown export/import/PNG, focus/keyboard/outside dismissal, coffee placement and developer link. Existing selectors inside menus need open-menu helpers. Recheck mobile native touches and viewport height with new border controls. Review all code via ak-review, resolve findings, clean git status, push and verify.
