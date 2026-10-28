@@ -41,7 +41,10 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
       await clickControl(page, '#btn-png');
       const png = await download;
       assert.equal(await png.failure(), null);
-      assert.ok((await require('node:fs/promises').stat(await png.path())).size > 1000);
+      const file = await png.path(); assert.ok(file);
+      const bytes = await require('node:fs/promises').readFile(file);
+      assert.ok(bytes.length > 1000);
+      assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
       assert.deepEqual(errors, []);
       await context.close();
     }

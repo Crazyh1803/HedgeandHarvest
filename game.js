@@ -625,7 +625,7 @@
     return out;
   }
 
-  var LAYER_MAX_PIXELS = 16000000; // ~64 MB; also under Safari's 16.7M-pixel canvas area limit
+  var LAYER_MAX_PIXELS = 16000000; // ~64 MB of pixel data per field layer
   /** Static diorama layer: tray, soil, paths and, when `withCorn`, the baked corn. Returns {canvas, w, h, withCorn} in css px.
    *  Without corn the stalks are drawn live from the sprite atlas (see drawCorn) so they can sway at their roots. */
   function buildLayer(s, season, t, dpr, withCorn) {
@@ -633,7 +633,7 @@
     // Bound the backing store: lower the layer's DPR (never its css size) so it stays within LAYER_MAX_PIXELS.
     dpr = Math.min(dpr, Math.sqrt(LAYER_MAX_PIXELS / (LW * LH)));
     var cv = document.createElement('canvas');
-    cv.width = Math.ceil(LW * dpr); cv.height = Math.ceil(LH * dpr);
+    cv.width = Math.max(1, Math.floor(LW * dpr)); cv.height = Math.max(1, Math.floor(LH * dpr));
     var g = cv.getContext('2d'); g.scale(dpr, dpr);
     var x0 = 0.3 * t, y0 = (ORGY - ORG + 0.3) * t, pw = LW - 0.6 * t, ph = (s.h + 2 * ORG - 0.6) * t, depth = 0.4 * t, rad = 0.5 * t;
     // tray: side + drop shadow, then top

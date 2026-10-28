@@ -6,6 +6,7 @@ const C = require('../game.js');
 test('three larger presets triple tile area while retaining existing fields', () => {
   assert.deepEqual(['small', 'medium', 'large'].map(k => [C.SIZES[k].w, C.SIZES[k].h]), [[15, 11], [25, 17], [35, 23]]);
   const sizes = Object.values(C.SIZES);
+  assert.deepEqual(Object.keys(C.SIZES), ['small', 'medium', 'large', 'expansive', 'grand', 'vast']);
   assert.equal(sizes.length, 6);
   for (let i = 3; i < sizes.length; i++) {
     assert.equal(sizes[i].w * sizes[i].h, sizes[i - 1].w * sizes[i - 1].h * 3);
