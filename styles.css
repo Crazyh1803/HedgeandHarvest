@@ -63,7 +63,7 @@ body {
   background: var(--cream); border: 1.5px solid var(--line); border-radius: 999px; padding: 3px 6px;
 }
 .now-bar .now-skip { padding: 0 12px; min-width: 44px; font-size: 0.8rem; }
-.now-bar .now-select { flex: 1 1 120px; min-width: 0; margin: 0; padding: 8px 10px; border-radius: 999px; text-overflow: ellipsis; }
+.now-bar .now-select { flex: 1 1 120px; min-width: 170px; margin: 0; padding: 8px 10px; border-radius: 999px; text-overflow: ellipsis; }
 .now-status { flex: 0 1 190px; min-width: 0; font-size: 0.8rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .support { font-size: 0.78rem; color: var(--muted); opacity: 0.9; }
 .support-link { color: var(--sage-deep); text-decoration: underline; text-underline-offset: 2px; }
@@ -310,6 +310,8 @@ body[data-purpose="maze"] .hud { display: none; }
   .dpad { grid-template-rows: repeat(2, 50px); gap: 4px; }
 }
 @media (max-width: 360px) {
+  /* Narrow phones wrap art tools; share the same vertical budget but reserve less canvas height. */
+  .now-bar .now-select { min-width: 0; }
   .field-toolbar { flex-wrap: wrap; }
   .canvas-wrap { height: min(34svh, calc(100svh - 540px)); min-height: 140px; }
 }
