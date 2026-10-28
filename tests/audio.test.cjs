@@ -133,10 +133,10 @@ test('rotation advances on the audio timeline and manual changes clean queued vo
     h.advance(0.1);
     assert.ok(h.voices.filter(v => !v.ended).length <= 40, 'playlist rotation must not leak voices');
   }
-  assert.equal(A.nowPlaying(), ids[1], 'second song should be audible after the 32-bar boundary');
+  assert.equal(A.nowPlaying().id, ids[1], 'second song should be audible after the 32-bar boundary');
   const old = h.voices.filter(v => !v.ended && v.startAt > h.ctx.currentTime);
   A.setTrack(ids[4]); for (let i = 0; i < 6; i++) h.advance(0.05);
-  assert.equal(A.nowPlaying(), ids[4]);
+  assert.equal(A.nowPlaying().id, ids[4]);
   assert.ok(old.every(v => v.stopAt <= v.startAt || v.ended), 'queued old-track voices must be canceled when selecting a different song');
   assert.equal(A.sfx(), false);
 });
