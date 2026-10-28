@@ -634,7 +634,7 @@
     dpr = Math.min(dpr, Math.sqrt(LAYER_MAX_PIXELS / (LW * LH)));
     var cv = document.createElement('canvas');
     cv.width = Math.max(1, Math.floor(LW * dpr)); cv.height = Math.max(1, Math.floor(LH * dpr));
-    var g = cv.getContext('2d'); g.scale(dpr, dpr);
+    var g = cv.getContext('2d'); g.scale(cv.width / LW, cv.height / LH);
     var x0 = 0.3 * t, y0 = (ORGY - ORG + 0.3) * t, pw = LW - 0.6 * t, ph = (s.h + 2 * ORG - 0.6) * t, depth = 0.4 * t, rad = 0.5 * t;
     // tray: side + drop shadow, then top
     g.save(); g.shadowColor = 'rgba(70,45,20,0.35)'; g.shadowBlur = 0.45 * t; g.shadowOffsetY = 0.22 * t;
@@ -1962,8 +1962,8 @@
 
     function draw(now, dt) {
       var g = ctx, dpr = ui.dpr, t = ui.t, pal = PAL[S.season], i, p;
-      // Swaying corn is drawn live over a corn-free ground layer; reduced motion uses one baked layer.
-      var sway = !ui.reduce;
+      // Bake corn once when zoomed too far out to see its sway, or when reduced motion is on.
+      var sway = !ui.reduce && t >= MOTION_MIN_T;
       if (ui.layerDirty || !ui.layer || ui.layer.withCorn === sway) {
         ui.layer = buildLayer(S, S.season, t, dpr, !sway); ui.layerDirty = false; ui.mm.dirty = true;
         ui.sprites = sway ? getSprites(S.season, t, dpr) : null;

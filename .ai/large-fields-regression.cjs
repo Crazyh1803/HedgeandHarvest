@@ -10,6 +10,14 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
       const context = await browser.newContext({ viewport, deviceScaleFactor: 2, reducedMotion: 'reduce', acceptDownloads: true });
       const page = await context.newPage(), errors = [];
+      await page.addInitScript(() => {
+        window.__largestCanvas = 0;
+        const original = HTMLCanvasElement.prototype.getContext;
+        HTMLCanvasElement.prototype.getContext = function (...args) {
+          window.__largestCanvas = Math.max(window.__largestCanvas, this.width * this.height);
+          return original.apply(this, args);
+        };
+      });
       page.on('pageerror', e => errors.push(e.message));
       await page.goto(pathToFileURL(path.resolve('index.html')).href);
       await page.locator('#modal-help button[data-close]').click();
@@ -41,10 +49,23 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
       await clickControl(page, '#btn-png');
       const png = await download;
       assert.equal(await png.failure(), null);
-      const file = await png.path(); assert.ok(file);
+      const file = await png.path();
+      assert.ok(file);
       const bytes = await require('node:fs/promises').readFile(file);
       assert.ok(bytes.length > 1000);
       assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+      assert.ok(await page.evaluate(() => window.__largestCanvas <= 16000000), 'all field canvases must obey the pixel budget');
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      await page.waitForFunction(() => window.__cornfield.cornMotion().active);
+      await page.evaluate(() => new Promise(resolve => {
+        let frames = 0;
+        function tick() { if (++frames === 10) resolve(); else requestAnimationFrame(tick); }
+        requestAnimationFrame(tick);
+      }));
+      await page.screenshot({ path: '.ai/previews/larger-fields-' + viewport.width + '.png' });
+      await page.locator('#btn-view').click();
+      await page.waitForFunction(() => !window.__cornfield.view().close && !window.__cornfield.cornMotion().active);
+      assert.equal(await page.evaluate(() => window.__cornfield.cornMotion().drawn), 0, 'tiny overview corn should be cached instead of redrawn individually');
       assert.deepEqual(errors, []);
       await context.close();
     }
