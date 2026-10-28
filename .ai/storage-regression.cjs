@@ -89,6 +89,19 @@ const C = require('../game.js');
       }
       await context.close();
     }
-    console.log('Storage PASS: v1 maze restoration preserves work and migrates purpose; unreadable saves backed up before art fallback.');
+    const freshContext = await browser.newContext();
+    const fresh = await freshContext.newPage();
+    await fresh.goto(url); await fresh.locator('#modal-help button[data-close]').click();
+    await fresh.locator('#field').focus(); await fresh.keyboard.press('ArrowRight');
+    await fresh.waitForFunction(() => /Autosaved/.test(document.getElementById('save-status').textContent));
+    const firstCarving = await fresh.evaluate(() => localStorage.getItem('cornfield-carver:v1'));
+    await fresh.locator('#tab-settings').click(); await fresh.locator('[data-size="small"]').click(); await fresh.locator('#confirm-ok').click();
+    await fresh.locator('#tab-play').click();
+    assert.equal(await fresh.locator('#btn-resume').isVisible(), true, 'the first saved carving must become available in Continue after a size replacement');
+    await fresh.locator('#btn-resume').click();
+    if (await fresh.locator('#modal-confirm').isVisible()) await fresh.locator('#confirm-ok').click();
+    assert.deepEqual(await fresh.evaluate(() => window.__cornfield.core.serialize(window.__cornfield.state()).rows), JSON.parse(firstCarving).rows);
+    await freshContext.close();
+    console.log('Storage PASS: planted startup/explicit Continue, legacy migration, checkpoint quota failure, fresh metadata isolation, latest and first-install carving restoration.');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

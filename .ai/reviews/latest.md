@@ -1,4 +1,3 @@
-VERDICT: CHANGES_REQUESTED
+VERDICT: APPROVE
 FINDINGS:
-- [HIGH] game.js:1316 — `newField()` retains `ui.ownsSave` from the previous field. After carving and autosaving, switching size and changing the name, season, or animal overwrites that carving with the fresh field without checkpointing it. Continue also points to the older checkpoint. — Capture the current saved field as `resumeRaw`, reset ownership, and refresh Continue when replacing the field. Add a regression covering this sequence.
-- [MED] audio.js:335 — `setAutoRotate(false)` chooses `trackIndexAt(beat)`, but `beat` is ahead of audible playback. Disabling rotation just before a transition can select the upcoming song and leave its queued notes intact instead of keeping the song currently playing. — Resolve the audible track from the onset timeline, cancel queued transitions, and reschedule using that track; test disabling rotation within the boundary’s lookahead window.
+- [MED] game.js:1326 — Continue visibility is not refreshed after releasing save ownership. If this session created the first saved carving, the card remains hidden because it previously checked the empty checkpoint, even though `ui.resumeRaw` now contains the carving. — Call `updateResume()` after replacing the field; add a regression starting with empty storage.

@@ -1324,6 +1324,7 @@
         ui.ownsSave = false;
       } else cancelSave();
       useState(maze ? core.newMaze(o) : core.newBlank(o)); savePrefs();
+      updateResume();
       say(core.SIZES[size].label + (maze ? ': a new maze is ready.' : ': a fresh planted field.'));
     }
     function confirmIf(cond, title, body, okLabel, fn) {
