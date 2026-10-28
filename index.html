@@ -68,40 +68,21 @@
     </section>
 
     <aside class="panel" aria-label="Field settings">
+      <section class="card minimap-card" aria-labelledby="minimap-title">
+        <h2 id="minimap-title">Field map</h2>
+        <canvas id="minimap" role="img" aria-label="Map of the whole field showing the visible area and the active character"></canvas>
+        <p class="note" id="minimap-note">Showing the whole field</p>
+      </section>
+
+      <div class="tabs" id="sidebar-tabs" role="tablist" aria-label="Sidebar sections">
+        <button type="button" role="tab" id="tab-play" aria-controls="panel-play" aria-selected="true" tabindex="0">Play</button>
+        <button type="button" role="tab" id="tab-settings" aria-controls="panel-settings" aria-selected="false" tabindex="-1">Settings</button>
+      </div>
+
+      <div class="tabpanel" id="panel-play" role="tabpanel" aria-labelledby="tab-play">
       <section class="card">
         <label class="label" for="creation-name">Name your field</label>
         <input id="creation-name" class="text" type="text" maxlength="40" autocomplete="off" spellcheck="false">
-      </section>
-
-      <section class="card">
-        <h2>Field size</h2>
-        <div class="seg" id="size-group" role="group" aria-label="Field size">
-          <button type="button" data-size="small" aria-pressed="false"><span>Cozy plot</span><small>15 &times; 11</small></button>
-          <button type="button" data-size="medium" aria-pressed="true"><span>Family farm</span><small>25 &times; 17</small></button>
-          <button type="button" data-size="large" aria-pressed="false"><span>Great field</span><small>35 &times; 23</small></button>
-        </div>
-      </section>
-
-      <section class="card">
-        <h2>Season</h2>
-        <div class="seasons" id="season-group" role="group" aria-label="Season">
-          <button type="button" data-season="spring" aria-pressed="false"><i class="dot spring"></i>Spring</button>
-          <button type="button" data-season="summer" aria-pressed="true"><i class="dot summer"></i>Summer</button>
-          <button type="button" data-season="autumn" aria-pressed="false"><i class="dot autumn"></i>Autumn</button>
-          <button type="button" data-season="winter" aria-pressed="false"><i class="dot winter"></i>Winter</button>
-        </div>
-      </section>
-
-      <section class="card">
-        <h2>Your runner</h2>
-        <div class="animals" id="animal-group" role="group" aria-label="Runner animal">
-          <button type="button" data-animal="dog" aria-pressed="true" aria-label="Dog"><canvas aria-hidden="true"></canvas><span>Dog</span></button>
-          <button type="button" data-animal="cat" aria-pressed="false" aria-label="Cat"><canvas aria-hidden="true"></canvas><span>Cat</span></button>
-          <button type="button" data-animal="cow" aria-pressed="false" aria-label="Cow"><canvas aria-hidden="true"></canvas><span>Cow</span></button>
-          <button type="button" data-animal="horse" aria-pressed="false" aria-label="Horse"><canvas aria-hidden="true"></canvas><span>Horse</span></button>
-          <button type="button" data-animal="pig" aria-pressed="false" aria-label="Pig"><canvas aria-hidden="true"></canvas><span>Pig</span></button>
-          <button type="button" data-animal="chicken" aria-pressed="false" aria-label="Chicken"><canvas aria-hidden="true"></canvas><span>Chicken</span></button>
-        </div>
       </section>
 
       <section class="card">
@@ -137,6 +118,40 @@
         </div>
         <p class="note" id="save-status">Autosave on</p>
       </section>
+      </div>
+
+      <div class="tabpanel" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
+      <section class="card">
+        <h2>Field size</h2>
+        <div class="seg" id="size-group" role="group" aria-label="Field size">
+          <button type="button" data-size="small" aria-pressed="false"><span>Cozy plot</span><small>15 &times; 11</small></button>
+          <button type="button" data-size="medium" aria-pressed="true"><span>Family farm</span><small>25 &times; 17</small></button>
+          <button type="button" data-size="large" aria-pressed="false"><span>Great field</span><small>35 &times; 23</small></button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Season</h2>
+        <div class="seasons" id="season-group" role="group" aria-label="Season">
+          <button type="button" data-season="spring" aria-pressed="false"><i class="dot spring"></i>Spring</button>
+          <button type="button" data-season="summer" aria-pressed="true"><i class="dot summer"></i>Summer</button>
+          <button type="button" data-season="autumn" aria-pressed="false"><i class="dot autumn"></i>Autumn</button>
+          <button type="button" data-season="winter" aria-pressed="false"><i class="dot winter"></i>Winter</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Your runner</h2>
+        <div class="animals" id="animal-group" role="group" aria-label="Runner animal">
+          <button type="button" data-animal="dog" aria-pressed="true" aria-label="Dog"><canvas aria-hidden="true"></canvas><span>Dog</span></button>
+          <button type="button" data-animal="cat" aria-pressed="false" aria-label="Cat"><canvas aria-hidden="true"></canvas><span>Cat</span></button>
+          <button type="button" data-animal="cow" aria-pressed="false" aria-label="Cow"><canvas aria-hidden="true"></canvas><span>Cow</span></button>
+          <button type="button" data-animal="horse" aria-pressed="false" aria-label="Horse"><canvas aria-hidden="true"></canvas><span>Horse</span></button>
+          <button type="button" data-animal="pig" aria-pressed="false" aria-label="Pig"><canvas aria-hidden="true"></canvas><span>Pig</span></button>
+          <button type="button" data-animal="chicken" aria-pressed="false" aria-label="Chicken"><canvas aria-hidden="true"></canvas><span>Chicken</span></button>
+        </div>
+      </section>
+      </div>
     </aside>
   </main>
 </div>

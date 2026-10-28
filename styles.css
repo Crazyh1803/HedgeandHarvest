@@ -138,7 +138,18 @@ body[data-mode="run"] .mode-switch button[aria-pressed="true"] { background: var
 .dpad-undo { grid-area: undo; padding: 0; }
 
 /* panel */
+html { scrollbar-gutter: stable; } /* tab switches never change the stage width */
 .panel { display: flex; flex-direction: column; gap: 12px; }
+.tabpanel { display: flex; flex-direction: column; gap: 12px; }
+.minimap-card h2 { margin-bottom: 8px; }
+.minimap-card .note { margin-top: 8px; }
+#minimap { display: block; width: 100%; max-width: 340px; height: auto; margin: 0 auto; border-radius: 10px; image-rendering: pixelated; }
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; background: var(--cream); border: 1.5px solid var(--line); border-radius: 999px; }
+.tabs [role="tab"] {
+  font: 700 0.92rem/1 var(--sans); color: var(--muted); background: transparent; border: 0; border-radius: 999px;
+  padding: 10px 14px; min-height: 44px; cursor: pointer;
+}
+.tabs [role="tab"][aria-selected="true"] { background: var(--sage-deep); color: #fff; }
 .card {
   background: var(--paper); border: 1.5px solid var(--line); border-radius: var(--radius); padding: 14px 16px;
   box-shadow: 0 4px 14px rgba(90, 60, 30, 0.07);
@@ -212,8 +223,8 @@ body[data-season="winter"] { --sage-deep: #4e7a96; }
   .stage { height: auto; min-height: 0; }
   .canvas-wrap { flex: none; height: min(66vh, 118vw); height: min(66dvh, 118vw); min-height: 300px; }
   .hud { padding-right: 0; margin-top: 46px; }
-  .panel { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .panel .card:first-child { grid-column: 1 / -1; }
+  .tabpanel { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .tabpanel .card:first-child { grid-column: 1 / -1; }
 }
 @media (max-width: 960px), (pointer: coarse) {
   .dpad { display: grid; }
@@ -224,7 +235,7 @@ body[data-season="winter"] { --sage-deep: #4e7a96; }
   .topbar { flex-wrap: wrap; }
   .top-actions .btn { padding-left: 10px; padding-right: 10px; font-size: 0.85rem; }
   .stage { padding: 8px; border-radius: 20px; }
-  .panel { grid-template-columns: 1fr; }
+  .tabpanel { grid-template-columns: 1fr; }
   .stat { padding: 6px 9px; gap: 6px; }
   .hud { gap: 5px; }
   .canvas-wrap { height: min(58vh, 120vw); height: min(58dvh, 120vw); }
