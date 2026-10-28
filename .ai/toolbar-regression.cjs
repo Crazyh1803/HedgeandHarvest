@@ -19,6 +19,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     const about = page.locator('#about-developer');
     assert.equal(await about.getAttribute('href'), 'https://appsbydan.com');
     assert.equal(await about.getAttribute('target'), '_blank');
+    assert.equal(await about.isVisible(), true);
     assert.ok((await about.getAttribute('rel')).includes('noopener'));
     const geometry = await page.evaluate(() => ({ field: document.getElementById('field').getBoundingClientRect().toJSON(), support: document.getElementById('field-support').getBoundingClientRect().toJSON(), sidebar: document.querySelector('.panel').getBoundingClientRect().toJSON() }));
     assert.ok(geometry.support.top >= geometry.field.bottom, 'coffee link belongs below the field');
@@ -46,6 +47,11 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     assert.equal(await page.locator('#maze-menu #mode-group').count(), 1);
     assert.equal(await page.locator('#maze-menu #gate-status').count(), 1);
     assert.equal(await page.locator('#maze-menu #btn-maze').count(), 1, 'Back to art belongs inside Maze options so only the two menus remain');
+    await page.locator('#maze-summary').focus(); await page.keyboard.press('Enter'); await page.keyboard.press('Escape');
+    assert.equal(await page.locator('#maze-menu').getAttribute('open'), null);
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'maze-summary');
+    await page.locator('#maze-summary').click(); await page.locator('#creation-name').click();
+    assert.equal(await page.locator('#maze-menu').getAttribute('open'), null);
     await clickControl(page, '#btn-place-start'); await page.locator('#field').focus(); await page.keyboard.press('Enter');
     await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight');
     await clickControl(page, '#btn-place-exit'); await page.locator('#field').focus(); await page.keyboard.press('Enter');
@@ -65,4 +71,3 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     console.log('Toolbar PASS: art/maze border tools, share dropdown exports, keyboard/focus/outside dismissal, victory share, under-field coffee and developer link.');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
-

@@ -14,6 +14,13 @@ catch { throw new Error('Mobile checks require Playwright; set PLAYWRIGHT_MODULE
     page.on('pageerror', e => errors.push(e.message));
     await page.goto(pathToFileURL(path.resolve('index.html')).href);
     await page.locator('#modal-help button[data-close]').click();
+    for (const viewport of [{ width: 390, height: 844 }, { width: 375, height: 667 }]) {
+      await page.setViewportSize(viewport); await page.waitForTimeout(150);
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, 'art toolbar must fit a phone without horizontal scrolling');
+      const pad = await page.locator('.dpad-btn.down').boundingBox();
+      assert.ok(pad.y + pad.height <= viewport.height, 'art mode D-pad should fit the initial phone viewport: ' + JSON.stringify({ viewport, pad }));
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
     const actor = () => page.evaluate(() => {
       const s = window.__cornfield.state(); return { x: s.purpose === 'maze' ? s.run.x : s.tractor.x, y: s.purpose === 'maze' ? s.run.y : s.tractor.y };
     });
@@ -80,4 +87,3 @@ catch { throw new Error('Mobile checks require Playwright; set PLAYWRIGHT_MODULE
     console.log('Mobile PASS: native touch directions, holds/releases/cancel, close-up, runner, downward drag, portrait reachability, landscape and outside-canvas scrolling.');
   } finally { await context.close(); await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
-

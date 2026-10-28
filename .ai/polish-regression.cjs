@@ -101,4 +101,3 @@ catch { throw new Error('Polish checks require Playwright; set PLAYWRIGHT_MODULE
     console.log('Polish PASS: rebrand/favicon, audible top song controls, muted/rapid skips, five optional support placements, successful load/win flow and four-direction animal renders.');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
-

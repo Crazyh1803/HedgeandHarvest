@@ -131,5 +131,3 @@ require('node:fs').mkdirSync('.ai/previews', { recursive: true });
     console.log('Browser PASS: rendering, independent audio toggles/context lifecycle, settings, JSON roundtrip/rejection/download, PNG, keyboard maze victory, autosave, touch controls, responsive widths; no page errors.');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
-
-

@@ -111,4 +111,3 @@ require('node:fs').mkdirSync('.ai/previews', { recursive: true });
     console.log('Play PASS: accessible settings tabs, input isolation, close-up minimap, six movement-driven gaits, static idle/blocked poses, responsive layout and reduced motion.');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
-
