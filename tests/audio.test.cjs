@@ -60,11 +60,11 @@ test('music has a frequent rhythmic arrangement with short voices and bounded lo
 });
 
 test('rapid music off/on does not double-schedule percussion within the lookahead', () => {
-  for (const delay of [0.04, 0.2]) {
+  for (const { delay, expectQueued } of [{ delay: 0.04, expectQueued: false }, { delay: 0.2, expectQueued: true }]) {
     const h = harness(); h.audio.setMusic(true); h.advance(delay);
     const count = h.voices.length;
     const queued = h.voices.filter(v => v.noise && v.filterFrequency >= 5000 && v.startAt > h.ctx.currentTime).map(v => v.startAt);
-    if (delay === 0.2) assert.ok(queued.length > 0, 'exercise a genuinely queued future beat');
+    if (expectQueued) assert.ok(queued.length > 0, 'exercise a genuinely queued future beat');
     h.audio.setMusic(false); h.audio.setMusic(true);
     if (!queued.length) assert.equal(h.voices.length, count, 'rapid toggle without a queued beat must not add an onset');
     for (const time of queued) assert.equal(h.voices.filter(v => v.noise && v.filterFrequency >= 5000 && v.startAt === time && v.stopAt > v.startAt).length, 1, 'the canceled beat must be restored exactly once');
