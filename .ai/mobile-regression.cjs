@@ -58,13 +58,17 @@ catch { throw new Error('Mobile checks require Playwright; set PLAYWRIGHT_MODULE
     await touch('touchStart', drag.x, drag.y); await touch('touchMove', drag.x, drag.y + drag.dy); await touch('touchEnd', drag.x, drag.y + drag.dy);
     const afterDrag = await actor();
     assert.equal(afterDrag.x, beforeDrag.x); assert.ok(afterDrag.y > beforeDrag.y, 'dragging down on the field should walk down, never reverse');
+    const layouts = [];
     for (const viewport of [{ width: 390, height: 844 }, { width: 375, height: 667 }, { width: 844, height: 390 }]) {
       await page.setViewportSize(viewport); await page.evaluate(() => scrollTo(0, 0)); await page.waitForTimeout(250);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       const r = await page.locator('.dpad-btn.down').boundingBox();
       await page.screenshot({ path: `.ai/previews/mobile-touch-${viewport.width}.png`, fullPage: true });
-      assert.ok(r.width >= 44 && r.height >= 44, `touch controls must keep usable hit targets: ${JSON.stringify(r)}`);
-      if (viewport.height > viewport.width) assert.ok(r.y + r.height <= viewport.height, `D-pad should fit the initial portrait viewport ${viewport.width}x${viewport.height}: ${JSON.stringify(r)}`);
+      layouts.push({ viewport, button: r });
+    }
+    for (const { viewport, button } of layouts) {
+      assert.ok(button.width >= 44 && button.height >= 44, `touch controls must keep usable hit targets: ${JSON.stringify(layouts)}`);
+      if (viewport.height > viewport.width) assert.ok(button.y + button.height <= viewport.height, `D-pad should fit the initial portrait viewport: ${JSON.stringify(layouts)}`);
     }
     await page.setViewportSize({ width: 390, height: 844 }); await page.evaluate(() => scrollTo(0, 0));
     const marginX = await page.locator('#field').evaluate(el => Math.max(1, el.getBoundingClientRect().left / 2));
