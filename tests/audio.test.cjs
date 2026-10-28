@@ -135,9 +135,27 @@ test('rotation advances on the audio timeline and manual changes clean queued vo
     assert.ok(h.voices.filter(v => !v.ended).length <= 40, 'playlist rotation must not leak voices');
   }
   assert.equal(A.nowPlaying().id, ids[1], 'second song should be audible after the 32-bar boundary');
+  A.setAutoRotate(false);
+  assert.equal(A.track(), ids[1], 'turning rotation off should retain the audible song as the selected song');
   const old = h.voices.filter(v => !v.ended && v.startAt > h.ctx.currentTime);
   A.setTrack(ids[4]); for (let i = 0; i < 6; i++) h.advance(0.05);
   assert.equal(A.nowPlaying().id, ids[4]);
   assert.ok(old.every(v => v.stopAt <= v.startAt || v.ended), 'queued old-track voices must be canceled when selecting a different song');
   assert.equal(A.sfx(), false);
+});
+
+test('disabling rotation during a queued boundary keeps the audible song', () => {
+  const h = harness(), A = h.audio, ids = Array.from(A.tracks, t => t.id);
+  A.setMusic(true);
+  const boundary = A.rotationSteps * 60 / A.tracks[0].bpm / 2;
+  const target = boundary - 0.05;
+  while (h.ctx.currentTime < target - 1e-9) h.advance(Math.min(0.05, target - h.ctx.currentTime));
+  const queued = h.voices.filter(v => !v.ended && v.startAt > h.ctx.currentTime && v.stopAt > v.startAt);
+  assert.ok(queued.length > 0, 'exercise the upcoming-song notes inside the scheduling lookahead');
+  assert.equal(A.nowPlaying().id, ids[0]);
+  A.setAutoRotate(false);
+  assert.ok(queued.every(v => v.stopAt <= v.startAt), 'cancel the queued transition when rotation is disabled');
+  for (let i = 0; i < 10; i++) h.advance(0.05);
+  assert.equal(A.nowPlaying().id, ids[0]);
+  assert.equal(A.trackAt(A.rotationSteps * 3), ids[0]);
 });
