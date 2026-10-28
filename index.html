@@ -80,6 +80,12 @@
       </div>
 
       <div class="tabpanel" id="panel-play" role="tabpanel" aria-labelledby="tab-play">
+      <section class="card" id="resume-card" aria-labelledby="resume-title" hidden>
+        <h2 id="resume-title">Saved field</h2>
+        <button id="btn-resume" class="btn wide" type="button">Continue saved field</button>
+        <p class="note">Each visit starts with a fresh planted field. Starting a new carving keeps only your last field.</p>
+      </section>
+
       <section class="card">
         <label class="label" for="creation-name">Name your field</label>
         <input id="creation-name" class="text" type="text" maxlength="40" autocomplete="off" spellcheck="false">
@@ -151,6 +157,25 @@
           <button type="button" data-animal="chicken" aria-pressed="false" aria-label="Chicken"><canvas aria-hidden="true"></canvas><span>Chicken</span></button>
         </div>
       </section>
+
+      <section class="card" aria-labelledby="motion-title">
+        <h2 id="motion-title">Motion</h2>
+        <label class="label" for="motion-mode">Running and swaying corn</label>
+        <select id="motion-mode" class="text">
+          <option value="device">Follow my device</option>
+          <option value="full">Full motion</option>
+          <option value="reduced">Reduced motion</option>
+        </select>
+        <p class="note" id="motion-note" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="card" aria-labelledby="music-title">
+        <h2 id="music-title">Music</h2>
+        <label class="label" for="music-track">Song</label>
+        <select id="music-track" class="text"></select>
+        <label class="check" for="music-rotate"><input id="music-rotate" type="checkbox" checked> Auto rotate songs (about every minute)</label>
+        <p class="note" id="now-playing" role="status" aria-live="polite"></p>
+      </section>
       </div>
     </aside>
   </main>
@@ -165,7 +190,7 @@
       <li><b>Maze (optional).</b> Turn on <b>Maze</b> to reveal <b>Place start</b> and <b>Place exit</b>. Choose a button, then tap or click any spot in the field. Nothing is generated for you unless you press <b>Grow new maze</b>, and your art is kept when you switch Maze on or off.</li>
       <li><b>Run.</b> Once both gates are placed, switch to Run (or press M) and guide your animal along the cleared path to the coral flag. Corn blocks the way. The Route light turns green when a way through exists.</li>
       <li><b>U</b> or Ctrl+Z undoes (including gate placement). In a maze, <b>H</b> shows a hint and <b>R</b> resets the runner.</li>
-      <li>The whole field is shown by default; use <b>View</b> for an optional close-up. Fields autosave on this device. Export JSON or a PNG to share what you build.</li>
+      <li>The whole field is shown by default; use <b>View</b> for an optional close-up. Each visit starts with a fresh planted field; your last carving is kept on this device and can be reopened with Continue. Export JSON or a PNG to share what you build.</li>
     </ol>
     <div class="modal-actions"><button class="btn primary" type="button" data-close data-autofocus>Let's go</button></div>
   </div>

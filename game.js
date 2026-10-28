@@ -591,8 +591,9 @@
     return list;
   }
 
-  /** Static diorama layer: tray, soil, paths, corn. Returns {canvas, w, h} in css px. */
-  function buildLayer(s, season, t, dpr) {
+  /** Static diorama layer: tray, soil, paths and, when `withCorn`, the baked corn. Returns {canvas, w, h, withCorn} in css px.
+   *  Without corn the stalks are drawn live from the sprite atlas (see drawCorn) so they can sway at their roots. */
+  function buildLayer(s, season, t, dpr, withCorn) {
     var pal = PAL[season], LW = (s.w + 2 * ORG) * t, LH = (s.h + ORGY + ORG + 0.4) * t;
     var cv = document.createElement('canvas');
     cv.width = Math.ceil(LW * dpr); cv.height = Math.ceil(LH * dpr);
@@ -646,14 +647,43 @@
     }
     g.restore();
     // corn
-    var sprites = getSprites(season, t, dpr), sw = (1 + 2 * SPR.pad) * t, sh = (SPR.over + 1 + SPR.under) * t;
-    for (y = 0; y < s.h; y++) { // top to bottom so nearer rows overlap farther ones
-      for (x = 0; x < s.w; x++) {
-        if (!s.grid[y * s.w + x]) continue;
-        g.drawImage(sprites[hash(x, y, s.seed) % 6], fx + x * t - SPR.pad * t, fy + (y + 1 + SPR.under) * t - sh, sw, sh);
+    if (withCorn) {
+      var sprites = getSprites(season, t, dpr), sw = (1 + 2 * SPR.pad) * t, sh = (SPR.over + 1 + SPR.under) * t;
+      for (y = 0; y < s.h; y++) { // top to bottom so nearer rows overlap farther ones
+        for (x = 0; x < s.w; x++) {
+          if (!s.grid[y * s.w + x]) continue;
+          g.drawImage(sprites[hash(x, y, s.seed) % 6], fx + x * t - SPR.pad * t, fy + (y + 1 + SPR.under) * t - sh, sw, sh);
+        }
       }
     }
-    return { canvas: cv, w: LW, h: LH };
+    return { canvas: cv, w: LW, h: LH, withCorn: !!withCorn };
+  }
+
+  /** Corn sway: a slow wave across the field. Each cell's lean is a horizontal skew anchored at the
+   *  stalk base (the transform's origin), so roots never move. Returns the skew factor for a cell. */
+  var SWAY_AMP = 0.06, SWAY_W = 1.15;
+  function swayAt(x, y, seed, time) {
+    var j = (hash(x, y, seed ^ 0x5bd1) & 1023) / 1023;
+    return SWAY_AMP * Math.sin(SWAY_W * time + x * 0.42 + y * 0.27 + j * 1.6);
+  }
+  /** Draw the visible corn cells of a field straight onto the canvas (css px; the ctx already carries dpr).
+   *  Returns how many cells were drawn. Only cells whose sprite can touch the viewport are visited. */
+  function drawCorn(g, s, sprites, t, dpr, ox, oy, cw, ch, time) {
+    var sw = (1 + 2 * SPR.pad) * t, sh = (SPR.over + 1 + SPR.under) * t, bx = ox + ORG * t, by = oy + ORGY * t, n = 0;
+    var x0 = Math.max(0, Math.floor((-bx - sw) / t)), x1 = Math.min(s.w - 1, Math.ceil((cw - bx + sw) / t));
+    var y0 = Math.max(0, Math.floor((-by - sh) / t)), y1 = Math.min(s.h - 1, Math.ceil((ch - by + (SPR.over + 1) * t) / t));
+    for (var y = y0; y <= y1; y++) {
+      for (var x = x0; x <= x1; x++) {
+        if (!s.grid[y * s.w + x]) continue;
+        var k = swayAt(x, y, s.seed, time);
+        // origin = this cell's stalk base; x' = x + k*y (y is negative above the base)
+        g.setTransform(dpr, 0, -dpr * k, dpr, dpr * (bx + (x + 0.5) * t), dpr * (by + (y + 0.9) * t));
+        g.drawImage(sprites[hash(x, y, s.seed) % 6], -(SPR.pad + 0.5) * t, -(SPR.over + 0.9) * t, sw, sh);
+        n++;
+      }
+    }
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return n;
   }
 
   /* ---- toy tractor: raised side/front/back views with cab, fenders and big round tires ---- */
@@ -745,37 +775,53 @@
   var ANI_BODY = { dog: '#d9a86c', cat: '#e8a259', cow: '#fbf7ee', horse: '#a8683c', pig: '#f6aebb', chicken: '#fffaf0' };
   var ANI_FOOT = { dog: '#8a5a35', cat: '#c47a36', cow: '#f3b3b3', horse: '#4b2f20', pig: '#ee93a6', chicken: '#f0a030' };
 
+  var ANI_LEG = { dog: '#b98550', cat: '#d98d3e', cow: '#f1ece0', horse: '#6b4129', pig: '#f08ea5', chicken: '#f0a030' };
+
+  /* Four legs hang below the body, outside its outline. Diagonal pairs alternate (front-left with hind-right,
+     then the other two). A leg's cycle is sin(phase + offset): positive = swinging (paw lifted, reaching out),
+     negative = planted and pushing back. Phase 0 and every multiple of PI is the neutral pose for both pairs. */
+  function drawLeg(g, kind, r, sx, front, off, pose) {
+    var amt = pose ? pose.amount : 0, sw = pose ? Math.sin(pose.phase + off) * amt : 0, up = Math.max(0, sw), down = Math.max(0, -sw);
+    var hipX = sx * (front ? 0.26 : 0.5) * r, hipY = (front ? 0.78 : 0.68) * r;
+    var fx = hipX + sx * (front ? 0.1 : 0.08) * r * sw;
+    var fy = (front ? 1.2 : 1.1) * r - up * (kind === 'chicken' ? 0.36 : 0.32) * r * (front ? 1 : 0.85) + down * 0.07 * r;
+    var near = 1 + 0.22 * sw * (front ? 1 : 0.6); // a reaching paw comes toward the viewer
+    g.save(); g.lineCap = 'round'; g.strokeStyle = ANI_LEG[kind]; g.lineWidth = Math.max(0.16 * r, 2);
+    g.beginPath(); g.moveTo(hipX, hipY); g.lineTo(fx, fy - 0.03 * r); g.stroke();
+    ball(g, fx, fy, (front ? 0.19 : 0.16) * r * near, 0.11 * r * near, front ? ANI_FOOT[kind] : mix(ANI_FOOT[kind], -0.15));
+    if (front) {
+      g.strokeStyle = mix(ANI_FOOT[kind], -0.3); g.lineWidth = Math.max(0.5, 0.025 * r);
+      g.beginPath(); g.moveTo(fx - 0.04 * r, fy + 0.04 * r); g.lineTo(fx - 0.04 * r, fy - 0.02 * r);
+      g.moveTo(fx + 0.04 * r, fy + 0.04 * r); g.lineTo(fx + 0.04 * r, fy - 0.02 * r); g.stroke();
+    }
+    g.restore();
+  }
+
   // pose (optional): { phase, amount } from the distance-driven gait; omitted = the neutral, static pose.
   function drawAnimal(g, kind, cx, cy, r, pose) {
     var amt = pose ? pose.amount : 0, sn = pose ? Math.sin(pose.phase) * amt : 0, cs = pose ? Math.cos(pose.phase) * amt : 0;
-    var sq = pose ? Math.cos(2 * pose.phase) * amt : 0, lift = (kind === 'chicken' ? 0.22 : 0.16) * r;
-    var upL = Math.max(0, sn) * lift, upR = Math.max(0, -sn) * lift; // diagonal pairs: hind-left + front-right, then the other two
+    var sq = pose ? Math.cos(2 * pose.phase) * amt : 0;
     g.save(); g.translate(cx, cy);
     var H = 0.62 * r, hy = -0.14 * r, body = ANI_BODY[kind];
-    // grounded soft shadow, tail, hind feet, rounded body, front feet with toes
-    var sg = g.createRadialGradient(0, 0.95 * r, 0, 0, 0.95 * r, 0.75 * r);
+    // grounded soft shadow, tail, hind legs, rounded body, front legs with toes
+    var sg = g.createRadialGradient(0, 1.22 * r, 0, 0, 1.22 * r, 0.8 * r);
     sg.addColorStop(0, 'rgba(40,25,10,0.38)'); sg.addColorStop(1, 'rgba(40,25,10,0)');
-    g.save(); g.translate(0, 0.95 * r); g.scale(1, 0.2); g.translate(0, -0.95 * r);
-    g.fillStyle = sg; g.beginPath(); g.arc(0, 0.95 * r, 0.75 * r, 0, TAU); g.fill(); g.restore();
-    g.save(); g.translate(0.45 * r, 0.6 * r); g.rotate(0.3 * Math.sin(pose ? 2 * pose.phase + 1 : 0) * amt); g.translate(-0.45 * r, -0.6 * r);
+    g.save(); g.translate(0, 1.22 * r); g.scale(1, 0.2); g.translate(0, -1.22 * r);
+    g.fillStyle = sg; g.beginPath(); g.arc(0, 1.22 * r, 0.8 * r, 0, TAU); g.fill(); g.restore();
+    g.save(); g.translate(0.45 * r, 0.6 * r); g.rotate(0.45 * Math.sin(pose ? 2 * pose.phase + 1 : 0) * amt); g.translate(-0.45 * r, -0.6 * r);
     if (kind === 'cat') { g.strokeStyle = body; g.lineWidth = 0.14 * r; g.lineCap = 'round'; g.beginPath(); g.moveTo(0.4 * r, 0.7 * r); g.quadraticCurveTo(0.85 * r, 0.7 * r, 0.8 * r, 0.25 * r); g.stroke(); }
     else if (kind === 'cow' || kind === 'horse') { g.strokeStyle = kind === 'cow' ? '#3a3532' : '#4b2f20'; g.lineWidth = 0.1 * r; g.lineCap = 'round'; g.beginPath(); g.moveTo(0.45 * r, 0.6 * r); g.quadraticCurveTo(0.8 * r, 0.7 * r, 0.7 * r, 0.95 * r); g.stroke(); }
     else if (kind === 'dog') ball(g, 0.58 * r, 0.42 * r, 0.12 * r, 0.22 * r, '#b98550', 0.6);
     else if (kind === 'pig') { g.strokeStyle = '#ee93a6'; g.lineWidth = 0.07 * r; g.lineCap = 'round'; g.beginPath(); g.arc(0.58 * r, 0.5 * r, 0.1 * r, 0, TAU * 0.8); g.stroke(); }
     else poly(g, [0.4 * r, 0.45 * r, 0.82 * r, 0.1 * r, 0.7 * r, 0.5 * r, 0.9 * r, 0.42 * r, 0.45 * r, 0.75 * r], '#efe7d6');
     g.restore();
-    ball(g, -0.46 * r, 0.82 * r - upL, 0.14 * r, 0.1 * r, mix(ANI_FOOT[kind], -0.15));
-    ball(g, 0.46 * r, 0.82 * r - upR, 0.14 * r, 0.1 * r, mix(ANI_FOOT[kind], -0.15));
-    ball(g, 0, 0.5 * r, (kind === 'chicken' ? 0.64 : 0.6) * r * (1 + 0.04 * sq), 0.46 * r * (1 - 0.05 * sq), body);
-    for (var fi = -1; fi <= 1; fi += 2) {
-      var fu = fi > 0 ? upL : upR; // front-right rises with hind-left
-      ball(g, fi * 0.28 * r, 0.86 * r - fu, 0.18 * r, 0.12 * r, ANI_FOOT[kind]);
-      g.strokeStyle = mix(ANI_FOOT[kind], -0.3); g.lineWidth = Math.max(0.5, 0.025 * r); g.lineCap = 'round';
-      g.beginPath(); g.moveTo(fi * 0.28 * r - 0.04 * r, 0.9 * r - fu); g.lineTo(fi * 0.28 * r - 0.04 * r, 0.84 * r - fu);
-      g.moveTo(fi * 0.28 * r + 0.04 * r, 0.9 * r - fu); g.lineTo(fi * 0.28 * r + 0.04 * r, 0.84 * r - fu); g.stroke();
-    }
+    drawLeg(g, kind, r, -1, false, 0, pose); drawLeg(g, kind, r, 1, false, Math.PI, pose);   // hind-left with front-right
+    g.save(); g.translate(0, 0.75 * r); g.rotate(0.07 * sn); g.translate(0, -0.75 * r);    // the body rolls with each stride
+    ball(g, 0, 0.5 * r, (kind === 'chicken' ? 0.64 : 0.6) * r * (1 + 0.05 * sq), 0.46 * r * (1 - 0.06 * sq), body);
+    g.restore();
+    drawLeg(g, kind, r, -1, true, Math.PI, pose); drawLeg(g, kind, r, 1, true, 0, pose);
     // the head nods and tilts with the stride (a chicken pecks forward)
-    g.save(); g.translate(0, hy + (kind === 'chicken' ? 0.07 * r * cs : 0.04 * r * sq)); g.rotate(0.08 * sn); g.translate(0, -hy);
+    g.save(); g.translate(0, hy + (kind === 'chicken' ? 0.09 * r * cs : 0.06 * r * sq)); g.rotate(0.13 * sn); g.translate(0, -hy);
     function X(v) { return v * H; }
     function Y(v) { return hy + v * H; }
     function eyes(ex, ey, s) {
@@ -880,6 +926,8 @@
    * Controller
    * --------------------------------------------------------------- */
   var KEY = 'cornfield-carver:v1', BEST_KEY = 'cornfield-carver:best:v1', BACKUP_KEY = 'cornfield-carver:backup';
+  var PREV_KEY = 'cornfield-carver:previous', PREFS_KEY = 'cornfield-carver:prefs:v1';
+  var MOTION_MODES = ['device', 'full', 'reduced'];
   function $(id) { return document.getElementById(id); }
 
   function boot() {
@@ -888,7 +936,8 @@
     var ui = {
       mode: 'carve', view: 'fit', place: null, dpr: 0, cw: 0, ch: 0, t: 24, close: false, layer: null, layerDirty: true,
       ox: 0, oy: 0, vt: { x: 0, y: 0 }, vr: { x: 0, y: 0 }, particles: [], hint: null,
-      reduce: !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches),
+      reduce: false, motionMode: 'device', deviceReduce: false, cornT: 0, sprites: null, cornDrawn: 0,
+      ownsSave: false, resumeRaw: null, saveBlocked: false,
       startedAt: null, elapsed: 0, running: false, held: null, nextStep: 0, pointer: null, strokeTimer: 0,
       lastHud: '', saveTimer: 0, phase: 0, modal: null, lastFocus: null, confirmResolve: null, winShown: false,
       gait: { phase: 0, amount: 0, moving: false, px: null, py: null },
@@ -902,14 +951,54 @@
     function bests() {
       try { var b = JSON.parse(load(BEST_KEY) || '{}'); return b && typeof b === 'object' ? b : {}; } catch (e) { return {}; }
     }
-    function scheduleSave() {
+    function loadPrefs() {
+      var p = null;
+      try { p = JSON.parse(load(PREFS_KEY) || 'null'); } catch (e) { p = null; }
+      p = p && typeof p === 'object' ? p : {};
+      return {
+        size: typeof p.size === 'string' && hasOwn(core.SIZES, p.size) ? p.size : 'medium', season: core.SEASONS.indexOf(p.season) >= 0 ? p.season : 'summer',
+        animal: core.ANIMALS.indexOf(p.animal) >= 0 ? p.animal : 'dog', motion: MOTION_MODES.indexOf(p.motion) >= 0 ? p.motion : 'device'
+      };
+    }
+    // Last-used size, season, animal and motion live apart from the field save, so choosing them never touches KEY.
+    function savePrefs() {
+      store(PREFS_KEY, JSON.stringify({ size: S.size, season: S.season, animal: S.animal, motion: ui.motionMode }));
+    }
+    /* The saved field in KEY is only replaced by this session's own work. The first real write keeps the earlier
+       save as a one-deep checkpoint (PREV_KEY); if that cannot be kept, autosave pauses and the old save stays. */
+    function claimSave() {
+      var prev = load(KEY);
+      if (prev) {
+        var dest = core.parse(prev).ok ? PREV_KEY : BACKUP_KEY;
+        if (load(dest) !== prev && !store(dest, prev)) {
+          ui.saveBlocked = true;
+          $('save-status').textContent = 'Autosave paused for this session to preserve your earlier save. Export this field to keep it.';
+          return false;
+        }
+      }
+      ui.ownsSave = true;
+      return true;
+    }
+    /** edit = a real change to the field. Anything else (name, season, animal, maze toggle) only rides along once saving has started. */
+    function scheduleSave(edit) {
+      if (!edit && !ui.ownsSave) return;
       if (ui.saveBlocked) { $('save-status').textContent = 'Autosave paused for this session to preserve your earlier save. Export this field to keep it.'; return; }
+      if (!ui.ownsSave && !claimSave()) return;
       $('save-status').textContent = 'Saving...';
       clearTimeout(ui.saveTimer);
       ui.saveTimer = setTimeout(function () {
+        ui.saveTimer = 0;
         var ok = store(KEY, core.stringify(S, { tractor: true }));
         $('save-status').textContent = ok ? 'Autosaved on this device' : 'Autosave unavailable in this browser';
+        updateResume();
       }, 350);
+      updateResume();
+    }
+    function cancelSave() { clearTimeout(ui.saveTimer); ui.saveTimer = 0; }
+    function resumeSource() { return ui.ownsSave ? load(PREV_KEY) : ui.resumeRaw; }
+    function updateResume() {
+      var raw = resumeSource(), ok = !!raw && core.parse(raw).ok;
+      $('resume-card').hidden = !ok;
     }
 
     /* ---- helpers ---- */
@@ -936,13 +1025,14 @@
       if (ui.reduce || d > 1.01) { G.phase = 0; G.amount = 0; G.moving = false; return; } // reduced motion, or a teleport (reset/load)
       G.moving = d > 0.002;
       if (G.moving) {
-        G.phase = (G.phase + d * TAU) % TAU;
+        G.phase = (G.phase + d * TAU * 0.4) % TAU;   // one full stride (both leg pairs) every 2.5 cells
         G.amount += (1 - G.amount) * Math.min(1, dt * 18);
       } else {
-        // settle on the nearest neutral pose, then hold perfectly still
+        // settle on the nearest neutral half-cycle (a multiple of PI), so the next tap starts with the other leg pair
+        var rest = Math.round(G.phase / Math.PI) * Math.PI;
         G.amount -= G.amount * Math.min(1, dt * 12);
-        G.phase += (Math.round(G.phase / Math.PI) * Math.PI - G.phase) * Math.min(1, dt * 12);
-        if (G.amount < 0.02) { G.amount = 0; G.phase = 0; }
+        G.phase += (rest - G.phase) * Math.min(1, dt * 12);
+        if (G.amount < 0.02) { G.amount = 0; G.phase = rest % TAU; }
       }
     }
 
@@ -1008,7 +1098,7 @@
       e.preventDefault(); e.stopPropagation(); selectTab(TABS[n], true);
     });
     function resetTimer() { ui.startedAt = null; ui.elapsed = 0; ui.running = false; ui.winShown = false; $('win').hidden = true; }
-    function changed() { ui.layerDirty = true; ui.hint = null; scheduleSave(); updatePanel(); }
+    function changed() { ui.layerDirty = true; ui.hint = null; scheduleSave(true); updatePanel(); }
     function useState(ns) {
       S = ns; resetTimer(); syncActors(); ui.layerDirty = true; ui.hint = null; ui.place = null;
       if (S.purpose === 'art' || !core.isConfigured(S)) ui.mode = 'carve';
@@ -1184,7 +1274,7 @@
       core.setPurpose(S, maze ? 'maze' : 'art');
       resetTimer(); syncActors(); ui.hint = null; ui.place = null;
       if (!maze || !core.isConfigured(S)) ui.mode = 'carve';
-      scheduleSave(); updatePanel();
+      scheduleSave(false); updatePanel();
       say(maze ? 'Maze on. Place a start and an exit anywhere in the field.' : 'Back to art. Your field is untouched.');
     }
     function startPlace(which) {
@@ -1222,7 +1312,8 @@
     function newField(size) {
       var maze = S.purpose === 'maze';
       var o = { size: size, season: S.season, animal: S.animal, seed: randSeed(), name: S.name };
-      useState(maze ? core.newMaze(o) : core.newBlank(o)); scheduleSave();
+      cancelSave();   // a new field is not written until it is carved; the saved one stays for Continue
+      useState(maze ? core.newMaze(o) : core.newBlank(o)); savePrefs();
       say(core.SIZES[size].label + (maze ? ': a new maze is ready.' : ': a fresh planted field.'));
     }
     function confirmIf(cond, title, body, okLabel, fn) {
@@ -1295,13 +1386,13 @@
       var res = core.parse($('import-text').value);
       if (!res.ok) { $('import-error').textContent = res.error; return; }
       hideModal(true);
-      var apply = function () { useState(res.state); S.dirty = false; scheduleSave(); say('Loaded "' + S.name + '".'); };
+      var apply = function () { cancelSave(); useState(res.state); S.dirty = false; scheduleSave(true); say('Loaded "' + S.name + '".'); };
       if (S.dirty) ask('Replace your current field?', 'Importing "' + res.state.name + '" replaces the field you are working on. Export it first if you want to keep it. This cannot be undone.', 'Replace field').then(function (y) { if (y) apply(); });
       else apply();
     });
     function exportPng() {
       var cv = document.createElement('canvas'), t = Math.max(14, Math.min(40, Math.floor(1040 / (S.w + 2 * ORG))));
-      var layer = buildLayer(S, S.season, t, 1), pal = PAL[S.season];
+      var layer = buildLayer(S, S.season, t, 1, true), pal = PAL[S.season];
       var W = Math.ceil(layer.w) + 120, hd = 100, H = Math.ceil(layer.h) + hd + 70;
       var maze = core.isConfigured(S);
       cv.width = W; cv.height = H;
@@ -1316,7 +1407,7 @@
       var ox = ORG * t, oy = ORGY * t;
       if (maze) {
         drawFlag(g, lx + ox + (S.exit.x + 0.5) * t, ly + oy + (S.exit.y + 0.5) * t, t, 0);
-        drawAnimal(g, S.animal, lx + ox + (S.start.x + 0.5) * t, ly + oy + (S.start.y + 0.5) * t, t * 0.45);
+        drawAnimal(g, S.animal, lx + ox + (S.start.x + 0.5) * t, ly + oy + (S.start.y + 0.5) * t - 0.14 * t, t * 0.5);
       }
       drawTractor(g, lx + ox + (S.tractor.x + 0.5) * t, ly + oy + (S.tractor.y + 0.5) * t, t, S.tractor.dir, 0);
       g.fillStyle = '#6d6b5f'; g.font = '18px system-ui, sans-serif';
@@ -1453,7 +1544,7 @@
       resetTimer(); syncActors(); changed(); setMode('run');
     });
     $('win-share').addEventListener('click', openShare);
-    $('creation-name').addEventListener('input', function () { S.name = core.cleanName(this.value); scheduleSave(); });
+    $('creation-name').addEventListener('input', function () { S.name = core.cleanName(this.value); scheduleSave(false); });
     $('creation-name').addEventListener('blur', function () { this.value = S.name; });
     $('size-group').addEventListener('click', function (e) {
       var b = e.target.closest('button'); if (!b) return;
@@ -1463,12 +1554,12 @@
     });
     $('season-group').addEventListener('click', function (e) {
       var b = e.target.closest('button'); if (!b) return;
-      S.season = b.getAttribute('data-season'); ui.layerDirty = true; scheduleSave(); updatePanel();
+      S.season = b.getAttribute('data-season'); ui.layerDirty = true; savePrefs(); scheduleSave(false); updatePanel();
       say(S.season.charAt(0).toUpperCase() + S.season.slice(1) + ' has arrived.');
     });
     $('animal-group').addEventListener('click', function (e) {
       var b = e.target.closest('button'); if (!b) return;
-      S.animal = b.getAttribute('data-animal'); scheduleSave(); updatePanel(); say('Your runner is now a ' + S.animal + '.');
+      S.animal = b.getAttribute('data-animal'); savePrefs(); scheduleSave(false); updatePanel(); say('Your runner is now a ' + S.animal + '.');
     });
     // animal icons
     core.ANIMALS.forEach(function (a) {
@@ -1476,8 +1567,64 @@
       if (!cv) return;
       var d = Math.min(2, window.devicePixelRatio || 1), sz = 44;
       cv.width = cv.height = sz * d; var g = cv.getContext('2d'); g.scale(d, d);
-      drawAnimal(g, a, sz / 2, sz / 2 - 1, sz * 0.4);
+      drawAnimal(g, a, sz / 2, sz / 2 - 3, sz * 0.34);
     });
+
+    /* ---- motion: Device / Full / Reduced ---- */
+    var mq = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+    function applyMotion() {
+      ui.deviceReduce = !!(mq && mq.matches);
+      ui.reduce = ui.motionMode === 'reduced' || (ui.motionMode === 'device' && ui.deviceReduce);
+      $('motion-mode').value = ui.motionMode;
+      $('motion-note').textContent = ui.motionMode === 'device'
+        ? (ui.deviceReduce ? 'Your device asks for reduced motion, so running strides and swaying corn are off. Choose Full motion to turn them on anyway.'
+          : 'Following your device: animation is on.')
+        : ui.motionMode === 'full'
+          ? 'Full motion is on' + (ui.deviceReduce ? ', even though your device asks for reduced motion.' : '.')
+          : 'Reduced motion is on: strides and swaying corn stay still.';
+      if (ui.reduce) { ui.gait.phase = 0; ui.gait.amount = 0; ui.gait.moving = false; }
+    }
+    $('motion-mode').addEventListener('change', function () {
+      ui.motionMode = MOTION_MODES.indexOf(this.value) >= 0 ? this.value : 'device';
+      applyMotion(); savePrefs();
+    });
+    if (mq) { if (mq.addEventListener) mq.addEventListener('change', applyMotion); else if (mq.addListener) mq.addListener(applyMotion); }
+
+    /* ---- music: song picker, Auto rotate, now playing (see audio.js) ---- */
+    var npText = '';
+    function syncMusicUI() {
+      if (!audio || !audio.tracks) return;
+      var np = audio.nowPlaying(), txt = np.playing ? 'Now playing: ' + np.title : (audio.music() ? 'Starting: ' + np.title : 'Music is off. Selected: ' + np.title);
+      if ($('music-track').value !== audio.track()) $('music-track').value = audio.track();
+      $('music-rotate').checked = audio.autoRotate();
+      if (txt !== npText) { npText = txt; $('now-playing').textContent = txt; }
+    }
+    if (audio && audio.tracks) {
+      audio.tracks.forEach(function (tr) {
+        var o = document.createElement('option'); o.value = tr.id; o.textContent = tr.title; $('music-track').appendChild(o);
+      });
+      $('music-track').addEventListener('change', function () { audio.setTrack(this.value); });
+      $('music-rotate').addEventListener('change', function () { audio.setAutoRotate(this.checked); });
+      audio.onChange(syncMusicUI);
+      syncMusicUI();
+    } else { $('music-track').disabled = true; $('music-rotate').disabled = true; $('now-playing').textContent = 'Music is not available.'; }
+
+    /* ---- Continue: reopen the last saved field, only when asked ---- */
+    function doResume() {
+      var raw = resumeSource(), res = raw ? core.parse(raw) : null;
+      if (!res || !res.ok) { say('There is no saved field to continue.'); updateResume(); return; }
+      var apply = function () {
+        cancelSave();
+        useState(res.state); S.dirty = true;
+        ui.ownsSave = false; ui.resumeRaw = raw;   // the next real edit checkpoints it again
+        if (store(KEY, raw)) $('save-status').textContent = 'Reopened your saved field';
+        else $('save-status').textContent = 'Reopened your saved field (this browser cannot save it again)';
+        updateResume(); say('Reopened "' + S.name + '".');
+      };
+      if (S.dirty) ask('Replace your current field?', 'Continue reopens your last saved field and replaces the one you are working on. Export it first if you want to keep it. This cannot be undone.', 'Continue saved field').then(function (y) { if (y) apply(); });
+      else apply();
+    }
+    $('btn-resume').addEventListener('click', doResume);
 
     // One resize source: the observer (window resize only as a fallback). Unchanged sizes are ignored.
     if (window.ResizeObserver) new ResizeObserver(function () { computeLayout(false); }).observe(canvas.parentNode);
@@ -1494,6 +1641,7 @@
       ui.vt.x += (S.tractor.x - ui.vt.x) * k; ui.vt.y += (S.tractor.y - ui.vt.y) * k;
       ui.vr.x += (S.run.x - ui.vr.x) * k; ui.vr.y += (S.run.y - ui.vr.y) * k;
       stepGait(dt);
+      if (now - (ui.musicTick || 0) > 250) { ui.musicTick = now; syncMusicUI(); }
       if (ui.bump) ui.bump = Math.max(0, ui.bump - dt);
       var i, p;
       for (i = ui.particles.length - 1; i >= 0; i--) {
@@ -1508,7 +1656,12 @@
 
     function draw(now, dt) {
       var g = ctx, dpr = ui.dpr, t = ui.t, pal = PAL[S.season], i, p;
-      if (ui.layerDirty || !ui.layer) { ui.layer = buildLayer(S, S.season, t, dpr); ui.layerDirty = false; ui.mm.dirty = true; }
+      // Swaying corn is drawn live over a corn-free ground layer; reduced motion uses one baked layer.
+      var sway = !ui.reduce;
+      if (ui.layerDirty || !ui.layer || ui.layer.withCorn === sway) {
+        ui.layer = buildLayer(S, S.season, t, dpr, !sway); ui.layerDirty = false; ui.mm.dirty = true;
+        ui.sprites = sway ? getSprites(S.season, t, dpr) : null;
+      }
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       drawBackdrop(g, ui.cw, ui.ch, pal, now);
       // Camera: the whole field centred (fit); only the explicit close-up view follows the active actor.
@@ -1518,6 +1671,10 @@
       if (!ui.close || L.h <= ui.ch) ty = (ui.ch - L.h) / 2; else ty = Math.min(0, Math.max(ui.ch - L.h, ui.ch / 2 - (ORGY + a.y + 0.5) * t));
       ui.ox = Math.round(tx); ui.oy = Math.round(ty);
       g.drawImage(L.canvas, ui.ox, ui.oy, L.w, L.h);
+      if (sway) {
+        if (dt) ui.cornT += dt;
+        ui.cornDrawn = drawCorn(g, S, ui.sprites, t, dpr, ui.ox, ui.oy, ui.cw, ui.ch, ui.cornT);
+      } else ui.cornDrawn = 0;
       var bx = ui.ox + ORG * t, by = ui.oy + ORGY * t;
       function cx(x) { return bx + (x + 0.5) * t; }
       function cy(y) { return by + (y + 0.5) * t; }
@@ -1542,10 +1699,10 @@
       // actors, back to front
       // actors are drawn over the plants, so neither is ever hidden; the active one is always on top
       var G = ui.gait, pose = G.amount > 0.001 ? { phase: G.phase, amount: G.amount } : null;
-      var bob = pose ? -Math.abs(Math.sin(G.phase)) * 0.07 * t * G.amount : 0;
+      var bob = pose ? -Math.abs(Math.sin(G.phase)) * 0.09 * t * G.amount : 0;
       var jig = ui.bump && !ui.reduce ? Math.sin(ui.bump * 60) * 0.06 * t : 0;
       var tractor = { f: function () { drawTractor(g, cx(ui.vt.x), cy(ui.vt.y), t, S.tractor.dir, (ui.vt.x + ui.vt.y) % 1); } };
-      var runner = { f: function () { drawAnimal(g, S.animal, cx(ui.vr.x) + jig, cy(ui.vr.y) - 0.05 * t + bob, t * 0.43, pose); } };
+      var runner = { f: function () { drawAnimal(g, S.animal, cx(ui.vr.x) + jig, cy(ui.vr.y) - 0.14 * t + bob, t * 0.5, pose); } };
       var list = ready ? (runActive ? [tractor, runner] : [runner, tractor]) : [tractor];
       for (i = 0; i < list.length; i++) list[i].f();
       // particles
@@ -1561,23 +1718,25 @@
     }
 
     /* ---- start ---- */
-    var saved = load(KEY), res = saved ? core.parse(saved) : null, st, backedUp = false;
-    if (res && res.ok) { st = res.state; st.dirty = true; }
-    else {
-      // A save we cannot read is copied aside before the new field's autosave replaces it.
-      if (saved) {
-        backedUp = load(BACKUP_KEY) === saved || store(BACKUP_KEY, saved);
-        ui.saveBlocked = !backedUp;
-      }
-      st = core.newBlank({ size: 'medium', season: 'summer', animal: 'dog', seed: randSeed(), name: DEFAULT_NAME });
+    // Every visit opens a fresh, fully planted field in the last-used size, season and animal. Nothing is written
+    // to KEY here: the previous save stays untouched and is offered through Continue.
+    var saved = load(KEY), res = saved ? core.parse(saved) : null, prefs = loadPrefs(), backedUp = false;
+    if (res && res.ok) ui.resumeRaw = saved;
+    else if (saved) {
+      // A save we cannot read is copied aside before any later autosave could replace it.
+      backedUp = load(BACKUP_KEY) === saved || store(BACKUP_KEY, saved);
+      ui.saveBlocked = !backedUp;
     }
-    S = st;
+    ui.motionMode = prefs.motion;
+    S = core.newBlank({ size: prefs.size, season: prefs.season, animal: prefs.animal, seed: randSeed(), name: DEFAULT_NAME });
+    applyMotion();
     computeLayout(true);
     syncActors();
     updatePanel();
-    $('save-status').textContent = res && res.ok ? 'Restored your last field'
-      : backedUp ? 'Your earlier save could not be read; a copy is kept on this device' : 'Autosave on';
-    if (!res || !res.ok) scheduleSave();
+    updateResume();
+    $('save-status').textContent = res && res.ok ? 'A saved field is ready under Continue; autosave starts when you carve'
+      : backedUp ? 'Your earlier save could not be read; a copy is kept on this device'
+      : ui.saveBlocked ? 'Autosave paused for this session to preserve your earlier save. Export this field to keep it.' : 'Autosave starts when you carve';
     if (!load('cornfield-carver:seen')) { store('cornfield-carver:seen', '1'); showModal('modal-help'); }
     requestAnimationFrame(frame);
     // test hooks for smoke and integration checks
@@ -1587,9 +1746,22 @@
         return { view: ui.view, close: ui.close, t: ui.t, ox: ui.ox, oy: ui.oy, org: ORG, orgY: ORGY,
           gridX: ui.ox + ORG * ui.t, gridY: ui.oy + ORGY * ui.t, cw: ui.cw, ch: ui.ch, dpr: ui.dpr,
           canvasW: canvas.width, canvasH: canvas.height, layerW: ui.layer ? ui.layer.w : 0, layerH: ui.layer ? ui.layer.h : 0,
-          purpose: S.purpose, mode: ui.mode, place: ui.place, reduceMotion: ui.reduce, tab: ui.tab };
+          purpose: S.purpose, mode: ui.mode, place: ui.place, reduceMotion: ui.reduce, tab: ui.tab,
+          motionMode: ui.motionMode, deviceReduce: ui.deviceReduce };
       },
       animation: function () { return { phase: ui.gait.phase, moving: ui.gait.moving, amount: ui.gait.amount }; },
+      // active: corn is swaying live; drawn: corn cells drawn in the last frame (visible cells only)
+      cornMotion: function () {
+        return { active: !ui.reduce && !!ui.layer && !ui.layer.withCorn, drawn: ui.cornDrawn, amplitude: SWAY_AMP, time: ui.cornT };
+      },
+      // PNG data URL of the real animal renderer in a fixed pose, on a transparent 160x160 canvas
+      posePreview: function (kind, phase, amount) {
+        if (core.ANIMALS.indexOf(kind) < 0) return null;
+        var cv = document.createElement('canvas'), pg;
+        cv.width = cv.height = 160; pg = cv.getContext('2d');
+        drawAnimal(pg, kind, 80, 66, 56, { phase: +phase || 0, amount: Math.max(0, Math.min(1, amount === undefined ? 1 : +amount || 0)) });
+        return cv.toDataURL('image/png');
+      },
       minimap: function () {
         var m = ui.mm, cp = function (o) { return o && { x: o.x, y: o.y, w: o.w, h: o.h }; };
         return { rect: cp(m.rect), visible: cp(m.vis), actor: m.actor && { kind: m.actor.kind, x: m.actor.x, y: m.actor.y },
