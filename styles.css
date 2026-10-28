@@ -285,6 +285,7 @@ body[data-season="winter"] { --sage-deep: #4e7a96; }
 .menu[open] > summary { background: #e3efdd; box-shadow: inset 0 0 0 2px var(--sage-deep); }
 .menu > summary:focus-visible { outline: 3px solid #3f7fb0; outline-offset: 2px; }
 .menu-panel {
+  max-height: min(460px, 50svh); overflow-y: auto;
   position: absolute; top: calc(100% + 6px); z-index: 20; width: min(300px, 100%);
   display: flex; flex-direction: column; gap: 6px; padding: 8px;
   background: var(--paper); border: 1.5px solid var(--line); border-radius: 18px; box-shadow: var(--shadow);
@@ -307,4 +308,8 @@ body[data-purpose="maze"] .hud { display: none; }
   .top-actions .btn { min-height: 48px; }
   .canvas-wrap { height: min(38svh, calc(100svh - 540px)); min-height: 160px; }
   .dpad { grid-template-rows: repeat(2, 50px); gap: 4px; }
+}
+@media (max-width: 360px) {
+  .field-toolbar { flex-wrap: wrap; }
+  .canvas-wrap { height: min(34svh, calc(100svh - 540px)); min-height: 140px; }
 }

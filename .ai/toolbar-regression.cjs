@@ -56,6 +56,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight');
     await clickControl(page, '#btn-place-exit'); await page.locator('#field').focus(); await page.keyboard.press('Enter');
     await clickControl(page, '#mode-run');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'field', 'choosing Run should make the game ready for arrow keys immediately');
     await page.locator('#field').focus(); await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight');
     await page.locator('#win').waitFor({ state: 'visible' });
     await page.locator('#win-share').click(); await page.locator('#modal-share').waitFor({ state: 'visible' });

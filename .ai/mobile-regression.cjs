@@ -14,7 +14,7 @@ catch { throw new Error('Mobile checks require Playwright; set PLAYWRIGHT_MODULE
     page.on('pageerror', e => errors.push(e.message));
     await page.goto(pathToFileURL(path.resolve('index.html')).href);
     await page.locator('#modal-help button[data-close]').click();
-    for (const viewport of [{ width: 390, height: 844 }, { width: 375, height: 667 }]) {
+    for (const viewport of [{ width: 390, height: 844 }, { width: 375, height: 667 }, { width: 320, height: 640 }]) {
       await page.setViewportSize(viewport); await page.waitForTimeout(150);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, 'art toolbar must fit a phone without horizontal scrolling');
       const pad = await page.locator('.dpad-btn.down').boundingBox();

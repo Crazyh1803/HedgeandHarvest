@@ -1788,8 +1788,8 @@
     canvas.addEventListener('pointercancel', pointerEnd);
 
     /* ---- panel wiring ---- */
-    $('mode-carve').addEventListener('click', function () { setMode('carve'); });
-    $('mode-run').addEventListener('click', function () { setMode('run'); });
+    $('mode-carve').addEventListener('click', function () { setMode('carve'); canvas.focus(); });
+    $('mode-run').addEventListener('click', function () { setMode('run'); canvas.focus(); });
     $('btn-undo').addEventListener('click', doUndo);
     $('btn-undo2').addEventListener('click', doUndo);
     $('btn-reset').addEventListener('click', doReset);
