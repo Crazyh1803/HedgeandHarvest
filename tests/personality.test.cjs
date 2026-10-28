@@ -31,6 +31,28 @@ test('stalk bursts start and stop smoothly without angle discontinuities', () =>
   }
 });
 
+test('each complete sway burst is short and reaches a visible gentle lean', () => {
+  let complete = 0;
+  for (let plant = 0; plant < 3; plant++) {
+    let run = null;
+    for (let i = 0; i <= 3000; i++) {
+      const time = i / 50, pose = C.cornPose(3, 4, plant, 17, time);
+      if (pose.active) {
+        if (!run) run = { start: time, peak: 0, partial: i === 0 };
+        run.peak = Math.max(run.peak, Math.abs(pose.angle));
+      } else if (run) {
+        if (!run.partial) {
+          assert.ok(time - run.start >= 1.45 && time - run.start <= 2.55, 'bursts should last about 1.5–2.5 seconds');
+          assert.ok(run.peak >= 4.9 * Math.PI / 180 && run.peak <= 8.1 * Math.PI / 180, 'each burst should reach its readable 5–8 degree lean');
+          complete++;
+        }
+        run = null;
+      }
+    }
+  }
+  assert.ok(complete >= 6, 'sample several complete independent bursts');
+});
+
 test('runner facing follows actual screen-relative movement and stays put against walls', () => {
   const s = C.newMaze({ size: 'small', season: 'summer', animal: 'dog', seed: 42, name: 'Directions' });
   s.grid.fill(0); s.start = { x: 4, y: 4 }; s.exit = { x: 13, y: 9 }; C.resetRun(s);

@@ -428,16 +428,17 @@
     h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
     return h;
   }
-  function cornPose(x, y, plant, seed, time) {
+  function cornPose(x, y, plant, seed, time, out) {
+    out = out || {};
     var h = hash3(x * 3 + plant, y, (seed ^ 0x2f6b) | 0), h2 = hash3(h & 0xffff, (h >>> 16) + plant, 977);
     var period = 8 + 7 * ((h & 1023) / 1023), dur = 1.5 + ((h >>> 10) & 1023) / 1023;
     var off = ((h2 & 4095) / 4095) * period, peak = (5 + 3 * (((h2 >>> 12) & 255) / 255)) * Math.PI / 180;
     var tt = time + off, k = Math.floor(tt / period), local = tt - k * period;
-    if (!(local < dur)) return { angle: 0, active: false };
+    if (!(local < dur)) { out.angle = 0; out.active = false; return out; }
     var u = local / dur, env = Math.sin(Math.PI * u); env *= env;
-    var hk = hash3(k, plant + 11, h), sign = hk & 1 ? 1 : -1, ph = ((hk >>> 1) & 255) / 255;
-    var a = sign * peak * env * (0.65 + 0.35 * Math.cos(2 * Math.PI * (u + ph)));
-    return { angle: Math.max(-BURST_MAX, Math.min(BURST_MAX, a)), active: true };
+    var hk = hash3(k, plant + 11, h), sign = hk & 1 ? 1 : -1;
+    var a = sign * peak * env * Math.sin(2 * Math.PI * u) / 0.65;
+    out.angle = Math.max(-BURST_MAX, Math.min(BURST_MAX, a)); out.active = true; return out;
   }
 
   var core = {
@@ -698,7 +699,7 @@
     var sw = (1 + 2 * SPR.pad) * t, sh = (SPR.over + 1 + SPR.under) * t, bx = ox + ORG * t, by = oy + ORGY * t;
     var x0 = Math.max(0, Math.floor((-bx - sw) / t)), x1 = Math.min(s.w - 1, Math.ceil((cw - bx + sw) / t));
     var y0 = Math.max(0, Math.floor((-by - sh) / t)), y1 = Math.min(s.h - 1, Math.ceil((ch - by + (SPR.over + 1) * t) / t));
-    var moves = t >= MOTION_MIN_T, st = { drawn: 0, activeCells: 0, activePlants: 0, visiblePlants: 0 }, poses = [null, null, null];
+    var moves = t >= MOTION_MIN_T, st = { drawn: 0, activeCells: 0, activePlants: 0, visiblePlants: 0 }, poses = [{}, {}, {}];
     for (var y = y0; y <= y1; y++) {
       for (var x = x0; x <= x1; x++) {
         if (!s.grid[y * s.w + x]) continue;
@@ -706,7 +707,7 @@
         st.drawn++; st.visiblePlants += 3;
         if (moves) {
           for (p = 0; p < 3; p++) {
-            poses[p] = core.cornPose(x, y, p, s.seed, time);
+            poses[p] = core.cornPose(x, y, p, s.seed, time, poses[p]);
             if (poses[p].active) { anyActive = true; st.activePlants++; }
           }
         }
@@ -1308,6 +1309,7 @@
     function resetTimer() { ui.startedAt = null; ui.elapsed = 0; ui.running = false; ui.winShown = false; $('win').hidden = true; }
     function changed() { ui.layerDirty = true; ui.hint = null; scheduleSave(true); updatePanel(); }
     function useState(ns) {
+      showLoadedSupport(false);
       S = ns; resetTimer(); syncActors(); ui.layerDirty = true; ui.hint = null; ui.place = null;
       if (S.purpose === 'art' || !core.isConfigured(S)) ui.mode = 'carve';
       computeLayout(true); updatePanel();
@@ -1588,9 +1590,13 @@
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).then(function () { say('Copied to clipboard.'); }, fallback);
       else fallback();
     });
+    function showLoadedSupport(shown) {
+      $('loaded-support').hidden = !shown;
+      document.querySelector('.support-main').hidden = shown;
+    }
     function openImport() {
       $('import-text').value = ''; $('import-error').textContent = ''; $('import-file').value = '';
-      $('loaded-support').hidden = true;
+      showLoadedSupport(false);
       showModal('modal-import');
     }
     $('import-file').addEventListener('change', function () {
@@ -1606,7 +1612,7 @@
       var res = core.parse($('import-text').value);
       if (!res.ok) { $('import-error').textContent = res.error; return; }
       hideModal(true);
-      var apply = function () { cancelSave(); useState(res.state); S.dirty = false; scheduleSave(true); $('loaded-support').hidden = false; say('Loaded "' + S.name + '".'); };
+      var apply = function () { cancelSave(); useState(res.state); S.dirty = false; scheduleSave(true); showLoadedSupport(true); say('Loaded "' + S.name + '".'); };
       if (S.dirty) ask('Replace your current field?', 'Importing "' + res.state.name + '" replaces the field you are working on. Export it first if you want to keep it. This cannot be undone.', 'Replace field').then(function (y) { if (y) apply(); });
       else apply();
     });
@@ -1864,7 +1870,7 @@
         ui.ownsSave = false; ui.resumeRaw = raw;   // the next real edit checkpoints it again
         if (store(KEY, raw)) $('save-status').textContent = 'Reopened your saved field';
         else $('save-status').textContent = 'Reopened your saved field (this browser cannot save it again)';
-        updateResume(); $('loaded-support').hidden = false; say('Reopened "' + S.name + '".');
+        updateResume(); showLoadedSupport(true); say('Reopened "' + S.name + '".');
       };
       if (S.dirty) ask('Replace your current field?', 'Continue reopens your last saved field and replaces the one you are working on. Export it first if you want to keep it. This cannot be undone.', 'Continue saved field').then(function (y) { if (y) apply(); });
       else apply();
@@ -2004,12 +2010,12 @@
           activePlants: c.activePlants, visiblePlants: c.visiblePlants, amplitude: BURST_MAX, time: ui.cornT };
       },
       // PNG data URL of the real animal renderer in a fixed pose and facing (0 right, 1 down, 2 left, 3 up; default
-      // front), on a transparent 160x160 canvas
+      // front), on a transparent 224x160 canvas with room for the full horse profile
       posePreview: function (kind, phase, amount, dir) {
         if (core.ANIMALS.indexOf(kind) < 0) return null;
         var cv = document.createElement('canvas'), pg;
-        cv.width = cv.height = 160; pg = cv.getContext('2d');
-        drawAnimal(pg, kind, 80, 66, 56, { phase: +phase || 0, amount: Math.max(0, Math.min(1, amount === undefined ? 1 : +amount || 0)) }, dir === undefined ? 1 : dir);
+        cv.width = 224; cv.height = 160; pg = cv.getContext('2d');
+        drawAnimal(pg, kind, 112, 66, 56, { phase: +phase || 0, amount: Math.max(0, Math.min(1, amount === undefined ? 1 : +amount || 0)) }, dir === undefined ? 1 : dir);
         return cv.toDataURL('image/png');
       },
       minimap: function () {

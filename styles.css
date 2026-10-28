@@ -142,6 +142,7 @@ body[data-mode="run"] .mode-switch button[aria-pressed="true"] { background: var
   grid-template-areas: ". up undo" "left down right";
 }
 .dpad-btn {
+  min-width: 48px; min-height: 48px;
   font-size: 1.2rem; color: var(--sage-deep); background: var(--cream); border: 1.5px solid var(--line);
   border-radius: 16px; cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none;
   -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
@@ -261,7 +262,7 @@ body[data-season="winter"] { --sage-deep: #4e7a96; }
   .tabpanel { grid-template-columns: 1fr; }
   .stat { padding: 6px 9px; gap: 6px; }
   .hud { gap: 5px; }
-  .canvas-wrap { height: min(46vh, 112vw); height: min(46dvh, 112vw); min-height: 240px; }
+  .canvas-wrap { height: min(46vh, calc(100vh - 440px)); height: min(46svh, calc(100svh - 440px)); min-height: 200px; }
   .win { padding: 16px; }
 }
 @media (prefers-reduced-motion: reduce) {

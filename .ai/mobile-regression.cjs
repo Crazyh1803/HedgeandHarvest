@@ -61,12 +61,14 @@ catch { throw new Error('Mobile checks require Playwright; set PLAYWRIGHT_MODULE
       await page.setViewportSize(viewport); await page.evaluate(() => scrollTo(0, 0)); await page.waitForTimeout(250);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       const r = await page.locator('.dpad-btn.down').boundingBox();
-      assert.ok(r.width >= 44 && r.height >= 44, 'touch controls must keep usable hit targets');
-      if (viewport.height > viewport.width) assert.ok(r.y + r.height <= viewport.height, `D-pad should fit the initial portrait viewport ${viewport.width}x${viewport.height}`);
       await page.screenshot({ path: `.ai/previews/mobile-touch-${viewport.width}.png`, fullPage: true });
+      assert.ok(r.width >= 44 && r.height >= 44, `touch controls must keep usable hit targets: ${JSON.stringify(r)}`);
+      if (viewport.height > viewport.width) assert.ok(r.y + r.height <= viewport.height, `D-pad should fit the initial portrait viewport ${viewport.width}x${viewport.height}: ${JSON.stringify(r)}`);
     }
     await page.setViewportSize({ width: 390, height: 844 }); await page.evaluate(() => scrollTo(0, 0));
-    await touch('touchStart', 4, 700); await touch('touchMove', 4, 400); await touch('touchEnd', 4, 400);
+    const marginX = await page.locator('#field').evaluate(el => Math.max(1, el.getBoundingClientRect().left / 2));
+    await touch('touchStart', marginX, 700); await page.waitForTimeout(50);
+    await touch('touchMove', marginX, 400); await page.waitForTimeout(50); await touch('touchEnd', marginX, 400);
     await page.waitForTimeout(300);
     assert.ok(await page.evaluate(() => scrollY > 0), 'page scrolling outside the canvas must remain available');
     assert.deepEqual(errors, []);

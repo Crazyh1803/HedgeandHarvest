@@ -70,6 +70,7 @@ catch { throw new Error('Polish checks require Playwright; set PLAYWRIGHT_MODULE
     await page.locator('#import-text').fill(creation); await page.locator('#import-load').click();
     if (await page.locator('#modal-confirm').isVisible()) await page.locator('#confirm-ok').click();
     assert.equal(await page.locator('#loaded-support').isVisible(), true);
+    assert.equal(await page.locator('a.support-link[data-placement="main"]').isVisible(), false, 'a contextual support note should replace the ambient one, not duplicate it');
     await page.locator('#mode-run').click(); await page.locator('#field').focus(); await page.keyboard.press('ArrowRight');
     await page.locator('#win').waitFor({ state: 'visible' });
     assert.equal(await page.locator('#win a.support-link[data-placement="completed"]').isVisible(), true);
