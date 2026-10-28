@@ -28,9 +28,10 @@ The browser saves actual edits when storage is available. A new load starts plan
 
 Run `ak-test` (configured in `.agent.env`) for the Node core tests. No package installation is required.
 
-For browser checks, install Playwright or set `PLAYWRIGHT_MODULE` to an existing Playwright module directory. Set `BROWSER_TESTS=1`, then run `ak-test` to include all four browser suites: interaction/sharing, rendering, storage, and settings/minimap/gaits. They use installed Microsoft Edge by default; set `BROWSER_CHANNEL=chrome` for installed Chrome. PowerShell example: `$env:BROWSER_TESTS='1'; ak-test`. Screenshots are saved in `.ai/previews/`. Checks include idle pixels, camera stability, resize clearing, sharing, input, audio controls, tab keyboard navigation, minimap coordinates, all six running cycles, and reduced motion. The default Node suite tests the game core and audio scheduler without Playwright or a browser.
+For browser checks, install Playwright or set `PLAYWRIGHT_MODULE` to an existing Playwright module directory. Set `BROWSER_TESTS=1`, then run `ak-test` to include all five browser suites: interaction/sharing, rendering, storage, settings/minimap/gaits, and visible-pose/corn/playlist checks. They use installed Microsoft Edge by default; set `BROWSER_CHANNEL=chrome` for installed Chrome. PowerShell example: `$env:BROWSER_TESTS='1'; ak-test`. Screenshots are saved in `.ai/previews/`. Checks include idle pixels, camera stability, resize clearing, sharing, input, audio controls, tab keyboard navigation, minimap coordinates, all six running cycles, and reduced motion. The default Node suite tests the game core, audio scheduler, original-song fingerprint, five distinct melodies, muted selection, and musical rotation without Playwright or a browser.
 
 Procedural canvas graphics keep the current version small and offline. A fixed oblique toy view uses shaded volumes, visible corn stalks and ears, and grounded shadows for depth. These are 2.5D drawings; the game does not yet use a real 3D engine or model pipeline.
 
 The game model and map format are separate from rendering and browser input. Future mobile/PC work can retain the data model while adding a native renderer, packaging, performance tuning, and platform controls. The current release focuses on corn; future crops should be versioned additions to the map schema.
+
 
