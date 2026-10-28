@@ -20,6 +20,7 @@
       <button id="btn-music" class="btn ghost tog" type="button" aria-pressed="false">Music: Off</button>
       <button id="btn-sfx" class="btn ghost tog" type="button" aria-pressed="false">Sounds: Off</button>
       <button id="btn-help" class="btn ghost" type="button">How to play</button>
+      <a id="about-developer" class="btn ghost" href="https://appsbydan.com" target="_blank" rel="noopener noreferrer">About the developer</a>
     </div>
     <div id="now-playing-bar" class="now-bar" role="group" aria-label="Music player">
       <button id="music-prev" class="btn ghost now-skip" type="button" aria-label="Previous song">&#9664;&#9664;</button>
@@ -31,17 +32,39 @@
   </header>
 
   <main class="layout">
+    <div class="stage-col">
     <section class="stage" aria-label="Cornfield play area">
-      <div class="hud" aria-label="Game status">
-        <div class="stat maze-only"><span class="label">Time</span><b id="hud-time">0:00</b></div>
-        <div class="stat maze-only"><span class="label">Steps</span><b id="hud-moves">0</b></div>
-        <div class="stat"><span class="label">Corn left</span><b id="hud-corn">0</b></div>
-        <div class="stat route maze-only" data-ok="0"><span class="label">Route</span><b id="hud-route">Place gates</b></div>
-      </div>
-
-      <div class="mode-switch maze-only" id="mode-group" role="group" aria-label="Mode">
-        <button id="mode-carve" data-mode="carve" type="button" aria-pressed="true">Carve</button>
-        <button id="mode-run" data-mode="run" type="button" aria-pressed="false" disabled>Run</button>
+      <div class="field-toolbar" id="field-toolbar" role="group" aria-label="Field tools">
+        <div class="hud" aria-label="Game status">
+          <div class="stat maze-only"><span class="label">Time</span><b id="hud-time">0:00</b></div>
+          <div class="stat maze-only"><span class="label">Steps</span><b id="hud-moves">0</b></div>
+          <div class="stat"><span class="label">Corn left</span><b id="hud-corn">0</b></div>
+          <div class="stat route maze-only" data-ok="0"><span class="label">Route</span><b id="hud-route">Place gates</b></div>
+        </div>
+        <button id="btn-maze" class="btn tog" type="button" aria-pressed="false">Make it a maze</button>
+        <div class="mode-switch maze-only" id="mode-group" role="group" aria-label="Mode">
+          <button id="mode-carve" data-mode="carve" type="button" aria-pressed="true">Carve</button>
+          <button id="mode-run" data-mode="run" type="button" aria-pressed="false" disabled>Run</button>
+        </div>
+        <details id="maze-menu" class="menu maze-only">
+          <summary id="maze-summary" class="btn">Maze options</summary>
+          <div class="menu-panel menu-left">
+            <button id="btn-place-start" class="btn" type="button" aria-pressed="false">Place start</button>
+            <button id="btn-place-exit" class="btn" type="button" aria-pressed="false">Place exit</button>
+            <button id="btn-generate" class="btn" type="button">Grow new maze</button>
+            <button id="btn-hint" class="btn" type="button">Hint</button>
+            <button id="btn-reset" class="btn" type="button">Reset runner</button>
+          </div>
+        </details>
+        <details id="share-menu" class="menu">
+          <summary id="share-summary" class="btn">Share / Export</summary>
+          <div class="menu-panel menu-right">
+            <button id="btn-export-json" class="btn" type="button">Export JSON</button>
+            <button id="btn-import" class="btn" type="button">Import JSON</button>
+            <button id="btn-png" class="btn" type="button">Save picture (PNG)</button>
+          </div>
+        </details>
+        <p class="gate-status maze-only" id="gate-status" role="status">Start not placed. Exit not placed. Place both to run.</p>
       </div>
 
       <div class="canvas-wrap">
@@ -75,6 +98,8 @@
         <button id="btn-undo2" class="btn dpad-undo" type="button">Undo</button>
       </div>
     </section>
+    <p id="field-support" class="note support support-main">Enjoying the game? You can <a class="support-link" data-placement="main" href="https://buymeacoffee.com/AppsbyDan" target="_blank" rel="noopener noreferrer">buy Dan a coffee</a>.</p>
+    </div>
 
     <aside class="panel" aria-label="Field settings">
       <section class="card minimap-card" aria-labelledby="minimap-title">
@@ -109,32 +134,10 @@
         </div>
       </section>
 
-      <section class="card" aria-labelledby="maze-title">
-        <h2 id="maze-title">Make it a maze</h2>
-        <button id="btn-maze" class="btn tog wide" type="button" aria-pressed="false">Maze: Off</button>
-        <div class="maze-only">
-          <div class="grid2" style="margin-top:8px">
-            <button id="btn-place-start" class="btn" type="button" aria-pressed="false">Place start</button>
-            <button id="btn-place-exit" class="btn" type="button" aria-pressed="false">Place exit</button>
-            <button id="btn-generate" class="btn" type="button">Grow new maze</button>
-            <button id="btn-hint" class="btn" type="button">Hint</button>
-            <button id="btn-reset" class="btn wide" type="button">Reset runner</button>
-          </div>
-          <p class="gate-status" id="gate-status" role="status">Start not placed. Exit not placed. Place both to run.</p>
-        </div>
-      </section>
-
-      <section class="card">
-        <h2>Share &amp; keep</h2>
-        <div class="grid2">
-          <button id="btn-export-json" class="btn" type="button">Export JSON</button>
-          <button id="btn-import" class="btn" type="button">Import JSON</button>
-          <button id="btn-png" class="btn wide" type="button">Save picture (PNG)</button>
-        </div>
+      <section class="card" aria-label="Save status">
         <p class="note" id="save-status">Autosave on</p>
         <p class="note support" id="loaded-support" hidden>Enjoying the game? You can <a class="support-link" data-placement="loaded" href="https://buymeacoffee.com/AppsbyDan" target="_blank" rel="noopener noreferrer">buy Dan a coffee</a>.</p>
       </section>
-      <p class="note support support-main">Enjoying the game? You can <a class="support-link" data-placement="main" href="https://buymeacoffee.com/AppsbyDan" target="_blank" rel="noopener noreferrer">buy Dan a coffee</a>.</p>
       </div>
 
       <div class="tabpanel" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
