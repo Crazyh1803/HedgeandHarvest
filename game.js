@@ -20,7 +20,10 @@
   var SIZES = {
     small: { w: 15, h: 11, label: 'Cozy plot' },
     medium: { w: 25, h: 17, label: 'Family farm' },
-    large: { w: 35, h: 23, label: 'Great field' }
+    large: { w: 35, h: 23, label: 'Great field' },
+    expansive: { w: 69, h: 35, label: 'Wide acres' },
+    grand: { w: 105, h: 69, label: 'Grand estate' },
+    vast: { w: 207, h: 105, label: 'Harvest country' }
   };
   var SEASONS = ['spring', 'summer', 'autumn', 'winter'];
   var ANIMALS = ['dog', 'cat', 'cow', 'horse', 'pig', 'chicken'];
@@ -622,10 +625,13 @@
     return out;
   }
 
+  var LAYER_MAX_PIXELS = 16000000; // ~64 MB; also under Safari's 16.7M-pixel canvas area limit
   /** Static diorama layer: tray, soil, paths and, when `withCorn`, the baked corn. Returns {canvas, w, h, withCorn} in css px.
    *  Without corn the stalks are drawn live from the sprite atlas (see drawCorn) so they can sway at their roots. */
   function buildLayer(s, season, t, dpr, withCorn) {
     var pal = PAL[season], LW = (s.w + 2 * ORG) * t, LH = (s.h + ORGY + ORG + 0.4) * t;
+    // Bound the backing store: lower the layer's DPR (never its css size) so it stays within LAYER_MAX_PIXELS.
+    dpr = Math.min(dpr, Math.sqrt(LAYER_MAX_PIXELS / (LW * LH)));
     var cv = document.createElement('canvas');
     cv.width = Math.ceil(LW * dpr); cv.height = Math.ceil(LH * dpr);
     var g = cv.getContext('2d'); g.scale(dpr, dpr);
@@ -1326,8 +1332,15 @@
       if (!sized && !force) return;
       ui.cw = cw; ui.ch = ch; ui.dpr = dpr;
       if (sized) { canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr); }
-      var fit = Math.max(4, Math.floor(Math.min(cw / (S.w + 2 * ORG), ch / (S.h + ORGY + ORG + 0.4))));
-      var t = ui.view === 'close' ? Math.max(38, Math.round(fit * 1.7)) : fit;
+      // Whole-field tile: whole pixels while they are 4+, otherwise eighths of a pixel so the field always fits.
+      var fitF = Math.min(cw / (S.w + 2 * ORG), ch / (S.h + ORGY + ORG + 0.4));
+      var fit = fitF >= 4 ? Math.floor(fitF) : Math.max(0.5, Math.floor(fitF * 8) / 8);
+      var t = fit;
+      if (ui.view === 'close') {
+        // Close-up tile, kept small enough that the full-field layer stays within LAYER_MAX_PIXELS at 1x.
+        var maxT = Math.floor(Math.sqrt(LAYER_MAX_PIXELS / ((S.w + 2 * ORG) * (S.h + ORGY + ORG + 0.4))));
+        t = Math.max(fit, Math.min(maxT, Math.max(38, Math.round(fit * 1.7))));
+      }
       ui.close = ui.view === 'close';
       if (t !== ui.t || sized || !ui.layer) ui.layerDirty = true;
       ui.t = t;
