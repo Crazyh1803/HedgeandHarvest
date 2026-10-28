@@ -745,7 +745,11 @@
   var ANI_BODY = { dog: '#d9a86c', cat: '#e8a259', cow: '#fbf7ee', horse: '#a8683c', pig: '#f6aebb', chicken: '#fffaf0' };
   var ANI_FOOT = { dog: '#8a5a35', cat: '#c47a36', cow: '#f3b3b3', horse: '#4b2f20', pig: '#ee93a6', chicken: '#f0a030' };
 
-  function drawAnimal(g, kind, cx, cy, r) {
+  // pose (optional): { phase, amount } from the distance-driven gait; omitted = the neutral, static pose.
+  function drawAnimal(g, kind, cx, cy, r, pose) {
+    var amt = pose ? pose.amount : 0, sn = pose ? Math.sin(pose.phase) * amt : 0, cs = pose ? Math.cos(pose.phase) * amt : 0;
+    var sq = pose ? Math.cos(2 * pose.phase) * amt : 0, lift = (kind === 'chicken' ? 0.22 : 0.16) * r;
+    var upL = Math.max(0, sn) * lift, upR = Math.max(0, -sn) * lift; // diagonal pairs: hind-left + front-right, then the other two
     g.save(); g.translate(cx, cy);
     var H = 0.62 * r, hy = -0.14 * r, body = ANI_BODY[kind];
     // grounded soft shadow, tail, hind feet, rounded body, front feet with toes
@@ -753,20 +757,25 @@
     sg.addColorStop(0, 'rgba(40,25,10,0.38)'); sg.addColorStop(1, 'rgba(40,25,10,0)');
     g.save(); g.translate(0, 0.95 * r); g.scale(1, 0.2); g.translate(0, -0.95 * r);
     g.fillStyle = sg; g.beginPath(); g.arc(0, 0.95 * r, 0.75 * r, 0, TAU); g.fill(); g.restore();
+    g.save(); g.translate(0.45 * r, 0.6 * r); g.rotate(0.3 * Math.sin(pose ? 2 * pose.phase + 1 : 0) * amt); g.translate(-0.45 * r, -0.6 * r);
     if (kind === 'cat') { g.strokeStyle = body; g.lineWidth = 0.14 * r; g.lineCap = 'round'; g.beginPath(); g.moveTo(0.4 * r, 0.7 * r); g.quadraticCurveTo(0.85 * r, 0.7 * r, 0.8 * r, 0.25 * r); g.stroke(); }
     else if (kind === 'cow' || kind === 'horse') { g.strokeStyle = kind === 'cow' ? '#3a3532' : '#4b2f20'; g.lineWidth = 0.1 * r; g.lineCap = 'round'; g.beginPath(); g.moveTo(0.45 * r, 0.6 * r); g.quadraticCurveTo(0.8 * r, 0.7 * r, 0.7 * r, 0.95 * r); g.stroke(); }
     else if (kind === 'dog') ball(g, 0.58 * r, 0.42 * r, 0.12 * r, 0.22 * r, '#b98550', 0.6);
     else if (kind === 'pig') { g.strokeStyle = '#ee93a6'; g.lineWidth = 0.07 * r; g.lineCap = 'round'; g.beginPath(); g.arc(0.58 * r, 0.5 * r, 0.1 * r, 0, TAU * 0.8); g.stroke(); }
     else poly(g, [0.4 * r, 0.45 * r, 0.82 * r, 0.1 * r, 0.7 * r, 0.5 * r, 0.9 * r, 0.42 * r, 0.45 * r, 0.75 * r], '#efe7d6');
-    ball(g, -0.46 * r, 0.82 * r, 0.14 * r, 0.1 * r, mix(ANI_FOOT[kind], -0.15));
-    ball(g, 0.46 * r, 0.82 * r, 0.14 * r, 0.1 * r, mix(ANI_FOOT[kind], -0.15));
-    ball(g, 0, 0.5 * r, (kind === 'chicken' ? 0.64 : 0.6) * r, 0.46 * r, body);
+    g.restore();
+    ball(g, -0.46 * r, 0.82 * r - upL, 0.14 * r, 0.1 * r, mix(ANI_FOOT[kind], -0.15));
+    ball(g, 0.46 * r, 0.82 * r - upR, 0.14 * r, 0.1 * r, mix(ANI_FOOT[kind], -0.15));
+    ball(g, 0, 0.5 * r, (kind === 'chicken' ? 0.64 : 0.6) * r * (1 + 0.04 * sq), 0.46 * r * (1 - 0.05 * sq), body);
     for (var fi = -1; fi <= 1; fi += 2) {
-      ball(g, fi * 0.28 * r, 0.86 * r, 0.18 * r, 0.12 * r, ANI_FOOT[kind]);
+      var fu = fi > 0 ? upL : upR; // front-right rises with hind-left
+      ball(g, fi * 0.28 * r, 0.86 * r - fu, 0.18 * r, 0.12 * r, ANI_FOOT[kind]);
       g.strokeStyle = mix(ANI_FOOT[kind], -0.3); g.lineWidth = Math.max(0.5, 0.025 * r); g.lineCap = 'round';
-      g.beginPath(); g.moveTo(fi * 0.28 * r - 0.04 * r, 0.9 * r); g.lineTo(fi * 0.28 * r - 0.04 * r, 0.84 * r);
-      g.moveTo(fi * 0.28 * r + 0.04 * r, 0.9 * r); g.lineTo(fi * 0.28 * r + 0.04 * r, 0.84 * r); g.stroke();
+      g.beginPath(); g.moveTo(fi * 0.28 * r - 0.04 * r, 0.9 * r - fu); g.lineTo(fi * 0.28 * r - 0.04 * r, 0.84 * r - fu);
+      g.moveTo(fi * 0.28 * r + 0.04 * r, 0.9 * r - fu); g.lineTo(fi * 0.28 * r + 0.04 * r, 0.84 * r - fu); g.stroke();
     }
+    // the head nods and tilts with the stride (a chicken pecks forward)
+    g.save(); g.translate(0, hy + (kind === 'chicken' ? 0.07 * r * cs : 0.04 * r * sq)); g.rotate(0.08 * sn); g.translate(0, -hy);
     function X(v) { return v * H; }
     function Y(v) { return hy + v * H; }
     function eyes(ex, ey, s) {
@@ -777,7 +786,7 @@
     }
     var i;
     if (kind === 'dog') {
-      for (i = -1; i <= 1; i += 2) ball(g, X(i * 0.85), Y(-0.05), 0.3 * H, 0.55 * H, '#8a5a35', -i * 0.25);
+      for (i = -1; i <= 1; i += 2) ball(g, X(i * 0.85), Y(-0.05), 0.3 * H, 0.55 * H, '#8a5a35', -i * 0.25 + i * 0.35 * cs);
       ball(g, 0, hy, H, H * 0.96, body);
       flat(g, X(0.4), Y(-0.2), 0.3 * H, 0.3 * H, '#9a6a3e');
       ball(g, 0, Y(0.34), 0.5 * H, 0.36 * H, '#f6e6c8');
@@ -786,8 +795,8 @@
       eyes(0.36, -0.12, 1);
     } else if (kind === 'cat') {
       for (i = -1; i <= 1; i += 2) {
-        poly(g, [X(i * 0.97), Y(-0.2), X(i * 0.72), Y(-1.15), X(i * 0.22), Y(-0.82)], body);
-        poly(g, [X(i * 0.82), Y(-0.38), X(i * 0.7), Y(-0.94), X(i * 0.42), Y(-0.78)], '#f3b3b3');
+        poly(g, [X(i * 0.97), Y(-0.2), X(i * 0.72) + i * 0.08 * H * cs, Y(-1.15), X(i * 0.22), Y(-0.82)], body);
+        poly(g, [X(i * 0.82), Y(-0.38), X(i * 0.7) + i * 0.06 * H * cs, Y(-0.94), X(i * 0.42), Y(-0.78)], '#f3b3b3');
       }
       ball(g, 0, hy, H, H * 0.92, body);
       g.strokeStyle = '#b86d2a'; g.lineWidth = 0.06 * H; g.lineCap = 'round';
@@ -803,8 +812,8 @@
     } else if (kind === 'cow') {
       for (i = -1; i <= 1; i += 2) {
         ball(g, X(i * 0.55), Y(-0.98), 0.14 * H, 0.2 * H, '#efe0b8', i * 0.4);
-        ball(g, X(i * 1.0), Y(-0.45), 0.34 * H, 0.18 * H, '#fbf7ee', i * 0.3);
-        flat(g, X(i * 1.03), Y(-0.45), 0.2 * H, 0.09 * H, '#f3b3b3', i * 0.3);
+        ball(g, X(i * 1.0), Y(-0.45), 0.34 * H, 0.18 * H, '#fbf7ee', i * (0.3 + 0.4 * cs));
+        flat(g, X(i * 1.03), Y(-0.45), 0.2 * H, 0.09 * H, '#f3b3b3', i * (0.3 + 0.4 * cs));
       }
       flat(g, -0.22 * r, 0.45 * r, 0.2 * r, 0.14 * r, '#3a3532', 0.4);
       ball(g, 0, hy, H, H * 0.98, '#fbf7ee');
@@ -815,8 +824,8 @@
     } else if (kind === 'horse') {
       ball(g, 0, Y(-0.7), 0.36 * H, 0.5 * H, '#4b2f20');
       for (i = -1; i <= 1; i += 2) {
-        poly(g, [X(i * 0.82), Y(-0.45), X(i * 0.62), Y(-1.28), X(i * 0.28), Y(-0.75)], '#a8683c');
-        poly(g, [X(i * 0.66), Y(-0.6), X(i * 0.6), Y(-1.0), X(i * 0.4), Y(-0.75)], '#d9a07a');
+        poly(g, [X(i * 0.82), Y(-0.45), X(i * 0.62) + i * 0.1 * H * cs, Y(-1.28), X(i * 0.28), Y(-0.75)], '#a8683c');
+        poly(g, [X(i * 0.66), Y(-0.6), X(i * 0.6) + i * 0.08 * H * cs, Y(-1.0), X(i * 0.4), Y(-0.75)], '#d9a07a');
       }
       ball(g, 0, hy + 0.02 * r, 0.86 * H, 1.04 * H, '#a8683c');
       flat(g, 0, Y(0.0), 0.13 * H, 0.58 * H, '#f7ead6');
@@ -825,20 +834,21 @@
       ball(g, 0, Y(-0.66), 0.3 * H, 0.2 * H, '#4b2f20');
       eyes(0.42, -0.12, 0.95);
     } else if (kind === 'pig') {
-      for (i = -1; i <= 1; i += 2) poly(g, [X(i * 0.95), Y(-0.1), X(i * 0.4), Y(-0.9), X(i * 1.12), Y(-0.78)], '#ee93a6');
+      for (i = -1; i <= 1; i += 2) poly(g, [X(i * 0.95), Y(-0.1), X(i * 0.4), Y(-0.9), X(i * 1.12), Y(-0.78) + 0.14 * H * cs * i], '#ee93a6');
       ball(g, 0, hy, H, H * 0.94, body);
       for (i = -1; i <= 1; i += 2) flat(g, X(i * 0.66), Y(0.22), 0.17 * H, 0.1 * H, 'rgba(240,120,140,0.5)');
       ball(g, 0, Y(0.32), 0.48 * H, 0.34 * H, '#f08ea5');
       for (i = -1; i <= 1; i += 2) flat(g, X(i * 0.17), Y(0.33), 0.07 * H, 0.1 * H, '#a8465f');
       eyes(0.45, -0.12, 0.9);
     } else { // chicken
-      for (i = -1; i <= 1; i++) ball(g, X(i * 0.3), Y(-1.0 - (i === 0 ? 0.12 : 0)), 0.22 * H, 0.24 * H, '#e2453c');
+      for (i = -1; i <= 1; i++) ball(g, X(i * 0.3), Y(-1.0 - (i === 0 ? 0.12 : 0) - 0.07 * Math.abs(cs)),0.22 * H, 0.24 * H, '#e2453c');
       ball(g, 0, hy, H, H * 0.96, body);
-      for (i = -1; i <= 1; i += 2) ball(g, i * 0.45 * r, 0.5 * r, 0.18 * r, 0.3 * r, '#efe7d6', -i * 0.3);
+      for (i = -1; i <= 1; i += 2) ball(g, i * 0.45 * r, 0.5 * r, 0.18 * r, 0.3 * r, '#efe7d6', -i * (0.3 + 0.55 * amt * (0.5 + 0.5 * sq)));
       ball(g, 0, Y(0.58), 0.12 * H, 0.17 * H, '#e2453c');
       poly(g, [X(-0.22), Y(0.1), X(0.22), Y(0.1), 0, Y(0.5)], '#f0a030');
       eyes(0.44, -0.18, 1);
     }
+    g.restore();
     g.restore();
   }
 
@@ -880,8 +890,11 @@
       ox: 0, oy: 0, vt: { x: 0, y: 0 }, vr: { x: 0, y: 0 }, particles: [], hint: null,
       reduce: !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches),
       startedAt: null, elapsed: 0, running: false, held: null, nextStep: 0, pointer: null, strokeTimer: 0,
-      lastHud: '', saveTimer: 0, phase: 0, modal: null, lastFocus: null, confirmResolve: null, winShown: false
+      lastHud: '', saveTimer: 0, phase: 0, modal: null, lastFocus: null, confirmResolve: null, winShown: false,
+      gait: { phase: 0, amount: 0, moving: false, px: null, py: null },
+      mm: { w: 0, h: 0, cell: 1, pad: 4, base: null, dirty: true, rect: null, vis: null, actor: null }
     };
+    var mmCanvas = $('minimap'), mmCtx = mmCanvas.getContext('2d');
 
     /* ---- storage ---- */
     function store(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
@@ -913,7 +926,87 @@
 
     function syncActors() {
       ui.vt.x = S.tractor.x; ui.vt.y = S.tractor.y; ui.vr.x = S.run.x; ui.vr.y = S.run.y;
+      ui.gait.px = ui.vr.x; ui.gait.py = ui.vr.y; ui.gait.phase = 0; ui.gait.amount = 0; ui.gait.moving = false;
     }
+
+    /* ---- running gait: driven by the distance the runner really travels, never by the clock ---- */
+    function stepGait(dt) {
+      var G = ui.gait, dx = ui.vr.x - G.px, dy = ui.vr.y - G.py, d = Math.sqrt(dx * dx + dy * dy);
+      G.px = ui.vr.x; G.py = ui.vr.y;
+      if (ui.reduce || d > 1.01) { G.phase = 0; G.amount = 0; G.moving = false; return; } // reduced motion, or a teleport (reset/load)
+      G.moving = d > 0.002;
+      if (G.moving) {
+        G.phase = (G.phase + d * TAU) % TAU;
+        G.amount += (1 - G.amount) * Math.min(1, dt * 18);
+      } else {
+        // settle on the nearest neutral pose, then hold perfectly still
+        G.amount -= G.amount * Math.min(1, dt * 12);
+        G.phase += (Math.round(G.phase / Math.PI) * Math.PI - G.phase) * Math.min(1, dt * 12);
+        if (G.amount < 0.02) { G.amount = 0; G.phase = 0; }
+      }
+    }
+
+    /* ---- minimap: cached whole-field base (1 px per cell) plus a live viewport box and actor dot ---- */
+    function drawMinimap() {
+      var m = ui.mm, pal = PAL[S.season], c = m.cell, pd = m.pad, g = mmCtx, i;
+      if (m.w !== S.w || m.h !== S.h) { // backing store only changes with the field size
+        m.w = S.w; m.h = S.h; m.cell = c = Math.max(5, Math.floor(280 / S.w));
+        mmCanvas.width = S.w * c + 2 * pd; mmCanvas.height = S.h * c + 2 * pd;
+        m.base = document.createElement('canvas'); m.base.width = S.w; m.base.height = S.h; m.dirty = true;
+      }
+      if (m.dirty) {
+        var bg = m.base.getContext('2d');
+        for (var y = 0; y < S.h; y++) for (var x = 0; x < S.w; x++) {
+          bg.fillStyle = S.grid[y * S.w + x] ? pal.leaf : pal.path; bg.fillRect(x, y, 1, 1);
+        }
+        m.dirty = false;
+      }
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.fillStyle = mix(pal.soil, -0.1); g.fillRect(0, 0, mmCanvas.width, mmCanvas.height);
+      g.imageSmoothingEnabled = false;
+      g.drawImage(m.base, pd, pd, S.w * c, S.h * c);
+      function mx(v) { return pd + v * c; }
+      if (S.purpose === 'maze') {
+        if (S.start) { g.strokeStyle = '#e8735a'; g.lineWidth = 2; g.beginPath(); g.arc(mx(S.start.x + 0.5), mx(S.start.y + 0.5), c * 0.55, 0, TAU); g.stroke(); }
+        if (S.exit) { g.fillStyle = '#e8735a'; g.fillRect(mx(S.exit.x) + c * 0.1, mx(S.exit.y) + c * 0.1, c * 0.8, c * 0.8); g.strokeStyle = '#fff'; g.lineWidth = 1; g.strokeRect(mx(S.exit.x) + c * 0.1, mx(S.exit.y) + c * 0.1, c * 0.8, c * 0.8); }
+      }
+      // viewport in cell units (may extend past the field when the whole field is shown)
+      var t = ui.t, r = { x: -ui.ox / t - ORG, y: -ui.oy / t - ORGY, w: ui.cw / t, h: ui.ch / t };
+      var x0 = Math.max(0, r.x), y0 = Math.max(0, r.y), x1 = Math.min(S.w, r.x + r.w), y1 = Math.min(S.h, r.y + r.h);
+      var vis = { x: x0, y: y0, w: Math.max(0, x1 - x0), h: Math.max(0, y1 - y0) };
+      g.lineWidth = 3; g.strokeStyle = 'rgba(40,30,20,0.55)'; g.strokeRect(mx(vis.x), mx(vis.y), vis.w * c, vis.h * c);
+      g.lineWidth = 1.5; g.strokeStyle = '#ffffff'; g.strokeRect(mx(vis.x), mx(vis.y), vis.w * c, vis.h * c);
+      var runActive = ui.mode === 'run' && core.isConfigured(S), a = runActive ? ui.vr : ui.vt;
+      var ax = mx(a.x + 0.5), ay = mx(a.y + 0.5);
+      g.beginPath(); g.arc(ax, ay, Math.max(3, c * 0.5), 0, TAU);
+      g.fillStyle = runActive ? '#e8735a' : '#d94a3a'; g.fill(); g.lineWidth = 1.5; g.strokeStyle = '#fff'; g.stroke();
+      m.rect = r; m.vis = vis; m.actor = { kind: runActive ? 'runner' : 'tractor', x: a.x, y: a.y };
+    }
+
+    /* ---- sidebar tabs ---- */
+    var TABS = ['play', 'settings'];
+    function selectTab(name, focus) {
+      TABS.forEach(function (n) {
+        var on = n === name, tab = $('tab-' + n);
+        tab.setAttribute('aria-selected', on ? 'true' : 'false'); tab.tabIndex = on ? 0 : -1;
+        $('panel-' + n).hidden = !on;
+      });
+      ui.tab = name;
+      if (focus) $('tab-' + name).focus();
+    }
+    ui.tab = 'play';
+    $('sidebar-tabs').addEventListener('click', function (e) {
+      var b = e.target.closest('[role="tab"]'); if (b) selectTab(b.id.slice(4), false);
+    });
+    $('sidebar-tabs').addEventListener('keydown', function (e) {
+      var i = TABS.indexOf(ui.tab), n = -1;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') n = (i + 1) % TABS.length;
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') n = (i + TABS.length - 1) % TABS.length;
+      else if (e.key === 'Home') n = 0;
+      else if (e.key === 'End') n = TABS.length - 1;
+      if (n < 0) return;
+      e.preventDefault(); e.stopPropagation(); selectTab(TABS[n], true);
+    });
     function resetTimer() { ui.startedAt = null; ui.elapsed = 0; ui.running = false; ui.winShown = false; $('win').hidden = true; }
     function changed() { ui.layerDirty = true; ui.hint = null; scheduleSave(); updatePanel(); }
     function useState(ns) {
@@ -942,6 +1035,7 @@
     function updateViewButton() {
       $('btn-view').textContent = ui.close ? 'View: Close-up' : 'View: Whole field';
       $('btn-view').setAttribute('aria-pressed', ui.close ? 'true' : 'false');
+      $('minimap-note').textContent = ui.close ? 'Close-up: the white box is what you see' : 'Showing the whole field';
     }
 
     /* ---- panel ---- */
@@ -1254,6 +1348,7 @@
       if (ui.modal || isTyping(e) || e.altKey) return;
       if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) { doUndo(); e.preventDefault(); return; }
       if (e.ctrlKey || e.metaKey) return;
+      if (e.target.closest && e.target.closest('[role="tablist"]')) return; // tab keys never drive an actor
       var d = KEYS[e.key];
       if (d) {
         e.preventDefault();
@@ -1398,6 +1493,7 @@
       var k = ui.reduce ? 1 : Math.min(1, dt * 16);
       ui.vt.x += (S.tractor.x - ui.vt.x) * k; ui.vt.y += (S.tractor.y - ui.vt.y) * k;
       ui.vr.x += (S.run.x - ui.vr.x) * k; ui.vr.y += (S.run.y - ui.vr.y) * k;
+      stepGait(dt);
       if (ui.bump) ui.bump = Math.max(0, ui.bump - dt);
       var i, p;
       for (i = ui.particles.length - 1; i >= 0; i--) {
@@ -1412,7 +1508,7 @@
 
     function draw(now, dt) {
       var g = ctx, dpr = ui.dpr, t = ui.t, pal = PAL[S.season], i, p;
-      if (ui.layerDirty || !ui.layer) { ui.layer = buildLayer(S, S.season, t, dpr); ui.layerDirty = false; }
+      if (ui.layerDirty || !ui.layer) { ui.layer = buildLayer(S, S.season, t, dpr); ui.layerDirty = false; ui.mm.dirty = true; }
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       drawBackdrop(g, ui.cw, ui.ch, pal, now);
       // Camera: the whole field centred (fit); only the explicit close-up view follows the active actor.
@@ -1445,11 +1541,11 @@
       }
       // actors, back to front
       // actors are drawn over the plants, so neither is ever hidden; the active one is always on top
-      var bob = ui.reduce ? 0 : Math.sin(now / 140) * 0.03 * t;
-      var movingR = Math.abs(S.run.x - ui.vr.x) + Math.abs(S.run.y - ui.vr.y) > 0.05;
+      var G = ui.gait, pose = G.amount > 0.001 ? { phase: G.phase, amount: G.amount } : null;
+      var bob = pose ? -Math.abs(Math.sin(G.phase)) * 0.07 * t * G.amount : 0;
       var jig = ui.bump && !ui.reduce ? Math.sin(ui.bump * 60) * 0.06 * t : 0;
       var tractor = { f: function () { drawTractor(g, cx(ui.vt.x), cy(ui.vt.y), t, S.tractor.dir, (ui.vt.x + ui.vt.y) % 1); } };
-      var runner = { f: function () { drawAnimal(g, S.animal, cx(ui.vr.x) + jig, cy(ui.vr.y) - 0.05 * t + (movingR ? bob : 0), t * 0.43); } };
+      var runner = { f: function () { drawAnimal(g, S.animal, cx(ui.vr.x) + jig, cy(ui.vr.y) - 0.05 * t + bob, t * 0.43, pose); } };
       var list = ready ? (runActive ? [tractor, runner] : [runner, tractor]) : [tractor];
       for (i = 0; i < list.length; i++) list[i].f();
       // particles
@@ -1461,6 +1557,7 @@
         } else flat(g, bx + p.x * t, by + p.y * t, t * 0.07, t * 0.05, p.c, p.rot);
       }
       g.globalAlpha = 1;
+      drawMinimap();
     }
 
     /* ---- start ---- */
@@ -1490,7 +1587,14 @@
         return { view: ui.view, close: ui.close, t: ui.t, ox: ui.ox, oy: ui.oy, org: ORG, orgY: ORGY,
           gridX: ui.ox + ORG * ui.t, gridY: ui.oy + ORGY * ui.t, cw: ui.cw, ch: ui.ch, dpr: ui.dpr,
           canvasW: canvas.width, canvasH: canvas.height, layerW: ui.layer ? ui.layer.w : 0, layerH: ui.layer ? ui.layer.h : 0,
-          purpose: S.purpose, mode: ui.mode, place: ui.place, reduceMotion: ui.reduce };
+          purpose: S.purpose, mode: ui.mode, place: ui.place, reduceMotion: ui.reduce, tab: ui.tab };
+      },
+      animation: function () { return { phase: ui.gait.phase, moving: ui.gait.moving, amount: ui.gait.amount }; },
+      minimap: function () {
+        var m = ui.mm, cp = function (o) { return o && { x: o.x, y: o.y, w: o.w, h: o.h }; };
+        return { rect: cp(m.rect), visible: cp(m.vis), actor: m.actor && { kind: m.actor.kind, x: m.actor.x, y: m.actor.y },
+          field: { w: S.w, h: S.h, cell: m.cell, pad: m.pad, canvasW: mmCanvas.width, canvasH: mmCanvas.height },
+          close: ui.close, tab: ui.tab };
       }
     };
   }
