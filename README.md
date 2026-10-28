@@ -8,13 +8,15 @@ Open `index.html` in a modern browser. No install, build step, account, or inter
 
 ## Create and play
 
-New fields open as art projects, with an overview of the whole field. Choose a size and season, then carve your design with the tractor using arrow keys / WASD, the on-screen controls, or pointer dragging. Zoom in explicitly when you want a closer look.
+New fields open as art projects, with an overview of the whole field. Open the sidebar Settings tab to choose field size, season, and animal runner. The Play tab keeps your editing and sharing tools at hand. Carve with the tractor using arrow keys / WASD, the on-screen controls, or pointer dragging.
+
+Use View for an optional close-up. The full-field minimap remains visible above the sidebar tabs, with the active character, maze gates, and the current camera area. Runners have movement-driven strides and settle back to a neutral pose at rest. Reduced-motion mode keeps their pose static.
 
 Turn on Maze when you want a playable puzzle. Place the start and finish on the field, choose an animal, and switch to Run. The toggle preserves your carved design. You can also generate a maze as a separate action. Undo, reset, and hints help with editing and play.
 
 ## Audio
 
-Music and Sounds have independent toggles and are both off by default. Music is an original procedural loop with warm pads and soft keys, paced at 86 BPM. Effects use gentle short tones. Preferences are remembered, and audio pauses while the tab is hidden.
+Music and Sounds have independent toggles and are both off by default. The original procedural soundtrack uses a brighter rhythmic arrangement around 118 BPM, with percussion, bouncy bass, and short melodic notes. Effects use gentle short tones. Preferences are remembered, and audio pauses while the tab is hidden.
 
 ## Share
 
