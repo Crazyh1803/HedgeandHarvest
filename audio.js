@@ -119,14 +119,15 @@
   }
   function hushMusic() {
     if (!ctx) return;
-    var now = ctx.currentTime, cut = now + 0.45;
+    var now = ctx.currentTime, cut = now + 0.45, rewind = Infinity;
     for (var i = 0; i < live.length; i++) {
       var r = live[i];
       try {
-        if (r.start > now) { r.src.stop(r.start); r.end = r.start; }
+        if (r.start > now && r.end > r.start) { rewind = Math.min(rewind, r.start); r.src.stop(r.start); r.end = r.start; }
         else if (r.end > cut) { r.src.stop(cut); r.end = cut; }
       } catch (e) { /* ignore */ }
     }
+    if (rewind < Infinity) { beat -= Math.round((nextBeat - rewind) / SPS); nextBeat = rewind; }
   }
 
   function scheduleStep(step, t) {

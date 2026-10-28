@@ -60,13 +60,18 @@ test('music has a frequent rhythmic arrangement with short voices and bounded lo
 });
 
 test('rapid music off/on does not double-schedule percussion within the lookahead', () => {
-  const h = harness(); h.audio.setMusic(true); h.advance(0.04);
-  const count = h.voices.length;
-  h.audio.setMusic(false); h.audio.setMusic(true);
-  assert.equal(h.voices.length, count, 'rapid toggle must retain the rhythmic grid without scheduling a second onset');
-  h.advance(0.3);
-  const hats = h.voices.filter(v => v.noise && v.filterFrequency >= 5000 && v.stopAt > v.startAt).map(v => v.startAt.toFixed(4));
-  assert.equal(new Set(hats).size, hats.length);
+  for (const delay of [0.04, 0.2]) {
+    const h = harness(); h.audio.setMusic(true); h.advance(delay);
+    const count = h.voices.length;
+    const queued = h.voices.filter(v => v.noise && v.filterFrequency >= 5000 && v.startAt > h.ctx.currentTime).map(v => v.startAt);
+    if (delay === 0.2) assert.ok(queued.length > 0, 'exercise a genuinely queued future beat');
+    h.audio.setMusic(false); h.audio.setMusic(true);
+    if (!queued.length) assert.equal(h.voices.length, count, 'rapid toggle without a queued beat must not add an onset');
+    for (const time of queued) assert.equal(h.voices.filter(v => v.noise && v.filterFrequency >= 5000 && v.startAt === time && v.stopAt > v.startAt).length, 1, 'the canceled beat must be restored exactly once');
+    h.advance(0.15);
+    const hats = h.voices.filter(v => v.noise && v.filterFrequency >= 5000 && v.stopAt > v.startAt).map(v => v.startAt.toFixed(4));
+    assert.equal(new Set(hats).size, hats.length);
+  }
 });
 
 test('music and effects stay independent and hidden tabs stop the scheduler', () => {
