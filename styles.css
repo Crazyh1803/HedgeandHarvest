@@ -159,6 +159,9 @@ html { scrollbar-gutter: stable; } /* tab switches never change the stage width 
   width: 100%; font: 500 1rem var(--sans); color: var(--ink); background: #fff; border: 1.5px solid var(--line);
   border-radius: 12px; padding: 10px 12px; margin-top: 6px; min-height: 44px;
 }
+select.text { cursor: pointer; }
+.check { display: flex; gap: 10px; align-items: center; margin-top: 12px; font-size: 0.92rem; cursor: pointer; min-height: 44px; }
+.check input { width: 20px; height: 20px; accent-color: var(--sage-deep); }
 .text.mono { font: 0.82rem/1.4 ui-monospace, Menlo, Consolas, monospace; resize: vertical; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .note { margin: 10px 0 0; font-size: 0.82rem; color: var(--muted); }
