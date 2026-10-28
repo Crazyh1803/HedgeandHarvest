@@ -80,7 +80,7 @@
   function isConfigured(s) { return s.purpose === 'maze' && !!s.start && !!s.exit; }
 
   function resetRun(s) {
-    s.run = { x: s.start ? s.start.x : 0, y: s.start ? s.start.y : 0, moves: 0, won: false };
+    s.run = { x: s.start ? s.start.x : 0, y: s.start ? s.start.y : 0, moves: 0, won: false, dir: 1 }; // dir: ephemeral facing (0 right, 1 down, 2 left, 3 up), never saved
   }
 
   function inBounds(s, x, y) { return x >= 0 && y >= 0 && x < s.w && y < s.h; }
@@ -287,7 +287,7 @@
     if (r.won) return { moved: false, blocked: false, won: true };
     var nx = r.x + dx, ny = r.y + dy;
     if (!inBounds(s, nx, ny) || s.grid[idx(s, nx, ny)] === 1) return { moved: false, blocked: true, won: false };
-    r.x = nx; r.y = ny; r.moves++;
+    r.x = nx; r.y = ny; r.moves++; r.dir = dirIndex(dx, dy);
     if (nx === s.exit.x && ny === s.exit.y) r.won = true;
     return { moved: true, blocked: false, won: r.won };
   }
@@ -419,6 +419,27 @@
       purpose: purpose, grid: g, start: st, exit: ex, tractor: tr }) };
   }
 
+  /** Pure corn pose for one plant (0..2) of cell (x,y): rests most of the time, then a short smooth lean burst.
+   *  Returns { angle (radians, root-anchored lean), active }. Deterministic in (x, y, plant, seed, time).
+   *  Each plant: own period 8-15 s, burst 1.5-2.5 s (sin^2 envelope), peak lean 5-8 degrees. */
+  var BURST_MAX = 0.16;
+  function hash3(x, y, s) {
+    var h = (Math.imul(x + 1, 73856093) ^ Math.imul(y + 1, 19349663) ^ Math.imul((s | 0) + 7, 83492791)) >>> 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
+    return h;
+  }
+  function cornPose(x, y, plant, seed, time) {
+    var h = hash3(x * 3 + plant, y, (seed ^ 0x2f6b) | 0), h2 = hash3(h & 0xffff, (h >>> 16) + plant, 977);
+    var period = 8 + 7 * ((h & 1023) / 1023), dur = 1.5 + ((h >>> 10) & 1023) / 1023;
+    var off = ((h2 & 4095) / 4095) * period, peak = (5 + 3 * (((h2 >>> 12) & 255) / 255)) * Math.PI / 180;
+    var tt = time + off, k = Math.floor(tt / period), local = tt - k * period;
+    if (!(local < dur)) return { angle: 0, active: false };
+    var u = local / dur, env = Math.sin(Math.PI * u); env *= env;
+    var hk = hash3(k, plant + 11, h), sign = hk & 1 ? 1 : -1, ph = ((hk >>> 1) & 255) / 255;
+    var a = sign * peak * env * (0.65 + 0.35 * Math.cos(2 * Math.PI * (u + ph)));
+    return { angle: Math.max(-BURST_MAX, Math.min(BURST_MAX, a)), active: true };
+  }
+
   var core = {
     FORMAT: FORMAT, VERSION: VERSION, MAX_UNDO: MAX_UNDO, MAX_JSON: MAX_JSON, MAX_NAME: MAX_NAME,
     PURPOSES: PURPOSES, SIZES: SIZES, SEASONS: SEASONS, ANIMALS: ANIMALS, DIRS: DIRS,
@@ -426,7 +447,7 @@
     createState: createState, resetRun: resetRun, beginStroke: beginStroke, endStroke: endStroke,
     moveTractor: moveTractor, carveTo: carveTo, moveRunner: moveRunner, runTo: runTo, undo: undo,
     regenerate: regenerate, replant: replant, setPurpose: setPurpose, placeGate: placeGate, isConfigured: isConfigured, findPath: findPath, isSolvable: isSolvable, counts: counts,
-    serialize: serialize, stringify: stringify, parse: parse, inBounds: inBounds
+    serialize: serialize, stringify: stringify, parse: parse, inBounds: inBounds, cornPose: cornPose
   };
   root.CornfieldCore = core;
   if (typeof module !== 'undefined' && module.exports) module.exports = core;
@@ -564,31 +585,39 @@
   }
 
   /** A cell's worth of corn: a main plant with two smaller ones behind it, all drawn from a seeded generator. */
-  function drawCornSprite(g, pal, t, rnd, season) {
-    var cx = (SPR.pad + 0.5) * t, ry = (SPR.over + 0.9) * t;
+  function drawCornSprite(gs, pal, t, rnd, season) {
+    var cx = (SPR.pad + 0.5) * t, ry = (SPR.over + 0.9) * t, g = gs[0];
     var sh = g.createRadialGradient(cx + 0.06 * t, ry + 0.05 * t, 0, cx + 0.06 * t, ry + 0.05 * t, 0.46 * t);
     sh.addColorStop(0, 'rgba(40,25,10,0.38)'); sh.addColorStop(1, 'rgba(40,25,10,0)');
     g.save(); g.translate(cx, ry + 0.05 * t); g.scale(1, 0.34); g.translate(-cx, -(ry + 0.05 * t));
     g.fillStyle = sh; g.beginPath(); g.arc(cx + 0.06 * t, ry + 0.05 * t, 0.46 * t, 0, TAU); g.fill(); g.restore();
-    drawPlant(g, pal, season, t, cx - 0.2 * t, ry - 0.1 * t, 0.9 * t, 0.78, rnd);
-    drawPlant(g, pal, season, t, cx + 0.22 * t, ry - 0.08 * t, 0.85 * t, 0.74, rnd);
-    drawPlant(g, pal, season, t, cx + (rnd() - 0.5) * 0.06 * t, ry, 1.1 * t, 1, rnd);
+    var roots = [{ x: cx - 0.2 * t, y: ry - 0.1 * t }, { x: cx + 0.22 * t, y: ry - 0.08 * t }, null];
+    drawPlant(gs[1], pal, season, t, roots[0].x, roots[0].y, 0.9 * t, 0.78, rnd);
+    drawPlant(gs[2], pal, season, t, roots[1].x, roots[1].y, 0.85 * t, 0.74, rnd);
+    roots[2] = { x: cx + (rnd() - 0.5) * 0.06 * t, y: ry };
+    drawPlant(gs[3], pal, season, t, roots[2].x, roots[2].y, 1.1 * t, 1, rnd);
+    return roots;
   }
 
+  /* Per variant: `layers` = [shadow, backLeft, backRight, front] canvases, `roots` = each plant's root in sprite css px,
+     and `comp` = the cell composited from those same layers, so a resting cell (one drawImage) and a cell whose stalks
+     are moving look identical. */
   var spriteCache = {};
   function getSprites(season, t, dpr) {
     var key = season + '|' + t + '|' + dpr;
     if (spriteCache[key]) return spriteCache[key];
-    var list = [], w = Math.ceil((1 + 2 * SPR.pad) * t * dpr), h = Math.ceil((SPR.over + 1 + SPR.under) * t * dpr);
+    var out = { comp: [], layers: [], roots: [] }, w = Math.ceil((1 + 2 * SPR.pad) * t * dpr), h = Math.ceil((SPR.over + 1 + SPR.under) * t * dpr);
+    function mk() { var c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').scale(dpr, dpr); return c; }
     for (var v = 0; v < 6; v++) {
-      var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
-      var g = cv.getContext('2d'); g.scale(dpr, dpr);
-      drawCornSprite(g, PAL[season], t, mulberry32(v * 977 + 13), season);
-      list.push(cv);
+      var cvs = [mk(), mk(), mk(), mk()], comp = mk(), cg = comp.getContext('2d');
+      out.roots.push(drawCornSprite(cvs.map(function (c) { return c.getContext('2d'); }), PAL[season], t, mulberry32(v * 977 + 13), season));
+      cg.setTransform(1, 0, 0, 1, 0, 0);
+      for (var li = 0; li < 4; li++) cg.drawImage(cvs[li], 0, 0);
+      out.layers.push(cvs); out.comp.push(comp);
     }
     spriteCache = {}; // keep a single entry
-    spriteCache[key] = list;
-    return list;
+    spriteCache[key] = out;
+    return out;
   }
 
   /** Static diorama layer: tray, soil, paths and, when `withCorn`, the baked corn. Returns {canvas, w, h, withCorn} in css px.
@@ -652,38 +681,50 @@
       for (y = 0; y < s.h; y++) { // top to bottom so nearer rows overlap farther ones
         for (x = 0; x < s.w; x++) {
           if (!s.grid[y * s.w + x]) continue;
-          g.drawImage(sprites[hash(x, y, s.seed) % 6], fx + x * t - SPR.pad * t, fy + (y + 1 + SPR.under) * t - sh, sw, sh);
+          g.drawImage(sprites.comp[hash(x, y, s.seed) % 6], fx + x * t - SPR.pad * t, fy + (y + 1 + SPR.under) * t - sh, sw, sh);
         }
       }
     }
     return { canvas: cv, w: LW, h: LH, withCorn: !!withCorn };
   }
 
-  /** Corn sway: a slow wave across the field. Each cell's lean is a horizontal skew anchored at the
-   *  stalk base (the transform's origin), so roots never move. Returns the skew factor for a cell. */
-  var SWAY_AMP = 0.06, SWAY_W = 1.15;
-  function swayAt(x, y, seed, time) {
-    var j = (hash(x, y, seed ^ 0x5bd1) & 1023) / 1023;
-    return SWAY_AMP * Math.sin(SWAY_W * time + x * 0.42 + y * 0.27 + j * 1.6);
-  }
-  /** Draw the visible corn cells of a field straight onto the canvas (css px; the ctx already carries dpr).
-   *  Returns how many cells were drawn. Only cells whose sprite can touch the viewport are visited. */
+  /** Corn motion: each stalk rests most of the time and takes its own short lean burst (core.cornPose). Cells whose
+   *  three plants all rest draw the cached composite in one call; a cell with a moving stalk draws its cached shadow
+   *  and plant layers, each rotated about its own root so roots never move. Below MOTION_MIN_T px per tile motion is
+   *  invisible, so everything stays on the composite. Only cells whose sprite can touch the viewport are visited.
+   *  Returns { drawn, activeCells, activePlants, visiblePlants }. */
+  var MOTION_MIN_T = 10;
   function drawCorn(g, s, sprites, t, dpr, ox, oy, cw, ch, time) {
-    var sw = (1 + 2 * SPR.pad) * t, sh = (SPR.over + 1 + SPR.under) * t, bx = ox + ORG * t, by = oy + ORGY * t, n = 0;
+    var sw = (1 + 2 * SPR.pad) * t, sh = (SPR.over + 1 + SPR.under) * t, bx = ox + ORG * t, by = oy + ORGY * t;
     var x0 = Math.max(0, Math.floor((-bx - sw) / t)), x1 = Math.min(s.w - 1, Math.ceil((cw - bx + sw) / t));
     var y0 = Math.max(0, Math.floor((-by - sh) / t)), y1 = Math.min(s.h - 1, Math.ceil((ch - by + (SPR.over + 1) * t) / t));
+    var moves = t >= MOTION_MIN_T, st = { drawn: 0, activeCells: 0, activePlants: 0, visiblePlants: 0 }, poses = [null, null, null];
     for (var y = y0; y <= y1; y++) {
       for (var x = x0; x <= x1; x++) {
         if (!s.grid[y * s.w + x]) continue;
-        var k = swayAt(x, y, s.seed, time);
-        // origin = this cell's stalk base; x' = x + k*y (y is negative above the base)
-        g.setTransform(dpr, 0, -dpr * k, dpr, dpr * (bx + (x + 0.5) * t), dpr * (by + (y + 0.9) * t));
-        g.drawImage(sprites[hash(x, y, s.seed) % 6], -(SPR.pad + 0.5) * t, -(SPR.over + 0.9) * t, sw, sh);
-        n++;
+        var v = hash(x, y, s.seed) % 6, px = bx + x * t - SPR.pad * t, py = by + y * t - SPR.over * t, anyActive = false, p;
+        st.drawn++; st.visiblePlants += 3;
+        if (moves) {
+          for (p = 0; p < 3; p++) {
+            poses[p] = core.cornPose(x, y, p, s.seed, time);
+            if (poses[p].active) { anyActive = true; st.activePlants++; }
+          }
+        }
+        if (!anyActive) { g.drawImage(sprites.comp[v], px, py, sw, sh); continue; }
+        st.activeCells++;
+        var layers = sprites.layers[v], roots = sprites.roots[v];
+        g.drawImage(layers[0], px, py, sw, sh);
+        for (p = 0; p < 3; p++) {
+          var a = poses[p].angle;
+          if (!a) { g.drawImage(layers[p + 1], px, py, sw, sh); continue; }
+          // rotate about this stalk's root; positive angle leans the top to the right
+          g.setTransform(dpr * Math.cos(a), dpr * Math.sin(a), -dpr * Math.sin(a), dpr * Math.cos(a), dpr * (px + roots[p].x), dpr * (py + roots[p].y));
+          g.drawImage(layers[p + 1], -roots[p].x, -roots[p].y, sw, sh);
+          g.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
       }
     }
-    g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    return n;
+    return st;
   }
 
   /* ---- toy tractor: raised side/front/back views with cab, fenders and big round tires ---- */
@@ -780,7 +821,7 @@
   /* Four legs hang below the body, outside its outline. Diagonal pairs alternate (front-left with hind-right,
      then the other two). A leg's cycle is sin(phase + offset): positive = swinging (paw lifted, reaching out),
      negative = planted and pushing back. Phase 0 and every multiple of PI is the neutral pose for both pairs. */
-  function drawLeg(g, kind, r, sx, front, off, pose) {
+  function drawLeg(g, kind, r, sx, front, off, pose, noToes) {
     var amt = pose ? pose.amount : 0, sw = pose ? Math.sin(pose.phase + off) * amt : 0, up = Math.max(0, sw), down = Math.max(0, -sw);
     var hipX = sx * (front ? 0.26 : 0.5) * r, hipY = (front ? 0.78 : 0.68) * r;
     var fx = hipX + sx * (front ? 0.1 : 0.08) * r * sw;
@@ -789,7 +830,7 @@
     g.save(); g.lineCap = 'round'; g.strokeStyle = ANI_LEG[kind]; g.lineWidth = Math.max(0.16 * r, 2);
     g.beginPath(); g.moveTo(hipX, hipY); g.lineTo(fx, fy - 0.03 * r); g.stroke();
     ball(g, fx, fy, (front ? 0.19 : 0.16) * r * near, 0.11 * r * near, front ? ANI_FOOT[kind] : mix(ANI_FOOT[kind], -0.15));
-    if (front) {
+    if (front && !noToes) {
       g.strokeStyle = mix(ANI_FOOT[kind], -0.3); g.lineWidth = Math.max(0.5, 0.025 * r);
       g.beginPath(); g.moveTo(fx - 0.04 * r, fy + 0.04 * r); g.lineTo(fx - 0.04 * r, fy - 0.02 * r);
       g.moveTo(fx + 0.04 * r, fy + 0.04 * r); g.lineTo(fx + 0.04 * r, fy - 0.02 * r); g.stroke();
@@ -797,8 +838,174 @@
     g.restore();
   }
 
+  function groundShadow(g, r, rx) {
+    var sg = g.createRadialGradient(0, 1.22 * r, 0, 0, 1.22 * r, rx * r);
+    sg.addColorStop(0, 'rgba(40,25,10,0.38)'); sg.addColorStop(1, 'rgba(40,25,10,0)');
+    g.save(); g.translate(0, 1.22 * r); g.scale(1, 0.2); g.translate(0, -1.22 * r);
+    g.fillStyle = sg; g.beginPath(); g.arc(0, 1.22 * r, rx * r, 0, TAU); g.fill(); g.restore();
+  }
+
+  /* Side profile, facing right (the left view is this drawn mirrored). Diagonal legs move together as in the front view:
+     the near front leg pairs with the far hind leg. A leg's sin(phase + off) > 0 is the swing (paw lifted and reaching forward). */
+  function sideLeg(g, kind, r, hipX, off, far, pose) {
+    var amt = pose ? pose.amount : 0, sw = pose ? Math.sin(pose.phase + off) * amt : 0, up = Math.max(0, sw), down = Math.max(0, -sw);
+    var fx = hipX + 0.26 * r * sw, fy = 1.17 * r - up * 0.3 * r + down * 0.03 * r;
+    var lc = far ? mix(ANI_LEG[kind], -0.22) : ANI_LEG[kind], fc = far ? mix(ANI_FOOT[kind], -0.22) : ANI_FOOT[kind];
+    g.save(); g.lineCap = 'round'; g.strokeStyle = lc; g.lineWidth = Math.max((kind === 'chicken' ? 0.1 : 0.16) * r, 2);
+    g.beginPath(); g.moveTo(hipX, 0.7 * r); g.lineTo(fx, fy - 0.03 * r); g.stroke();
+    ball(g, fx + 0.05 * r, fy, 0.16 * r, 0.09 * r, fc);
+    g.restore();
+  }
+  function sideAnimal(g, kind, r, pose) {
+    var amt = pose ? pose.amount : 0, sn = pose ? Math.sin(pose.phase) * amt : 0, cs = pose ? Math.cos(pose.phase) * amt : 0;
+    var sq = pose ? Math.cos(2 * pose.phase) * amt : 0, body = ANI_BODY[kind], u = 0.5 * r, bx = -0.08 * r, i;
+    var rx = { dog: 0.72, cat: 0.66, cow: 0.8, horse: 0.82, pig: 0.76, chicken: 0.56 }[kind] * r;
+    groundShadow(g, r, 1.0);
+    // tail first, so the body overlaps its root
+    g.save(); g.lineCap = 'round';
+    var tx = bx - rx * 0.92, tw = 0.5 * sn;
+    if (kind === 'dog') { g.translate(tx, 0.4 * r); g.rotate(tw * 0.5); g.strokeStyle = '#b98550'; g.lineWidth = 0.14 * r; g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(-0.3 * r, -0.05 * r, -0.32 * r, -0.4 * r); g.stroke(); }
+    else if (kind === 'cat') { g.translate(tx, 0.5 * r); g.rotate(tw * 0.3); g.strokeStyle = body; g.lineWidth = 0.13 * r; g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(-0.5 * r, 0.05 * r, -0.42 * r, -0.45 * r); g.quadraticCurveTo(-0.4 * r, -0.65 * r, -0.28 * r, -0.62 * r); g.stroke(); }
+    else if (kind === 'cow') { g.translate(tx, 0.32 * r); g.rotate(tw * 0.3); g.strokeStyle = '#3a3532'; g.lineWidth = 0.08 * r; g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(-0.15 * r, 0.3 * r, -0.1 * r, 0.62 * r); g.stroke(); ball(g, -0.1 * r, 0.7 * r, 0.1 * r, 0.16 * r, '#3a3532'); }
+    else if (kind === 'horse') { g.translate(tx, 0.3 * r); g.rotate(tw * 0.35); poly(g, [0, -0.05 * r, -0.2 * r, 0.05 * r, -0.45 * r, 0.55 * r, -0.18 * r, 0.85 * r, -0.05 * r, 0.5 * r, 0.05 * r, 0.1 * r], '#4b2f20'); }
+    else if (kind === 'pig') { g.translate(tx, 0.35 * r); g.strokeStyle = '#ee93a6'; g.lineWidth = 0.07 * r; g.beginPath(); g.arc(-0.08 * r, -0.04 * r, 0.12 * r, 0.6, TAU * 0.9); g.stroke(); }
+    else { g.translate(tx + 0.1 * r, 0.3 * r); g.rotate(tw * 0.15); poly(g, [0, 0.1 * r, -0.5 * r, -0.5 * r, -0.28 * r, 0.1 * r], '#e2453c'); poly(g, [0, 0.12 * r, -0.62 * r, -0.12 * r, -0.28 * r, 0.22 * r], '#efe7d6'); poly(g, [0, 0.12 * r, -0.5 * r, 0.12 * r, -0.2 * r, 0.3 * r], '#c9b890'); }
+    g.restore();
+    sideLeg(g, kind, r, bx - rx * 0.55, 0, true, pose); sideLeg(g, kind, r, bx + rx * 0.55, Math.PI, true, pose);   // far legs
+    g.save(); g.translate(bx, 0.75 * r); g.rotate(0.04 * sn); g.translate(-bx, -0.75 * r);
+    ball(g, bx, 0.5 * r, rx * (1 + 0.04 * sq), (kind === 'chicken' ? 0.48 : 0.44) * r * (1 - 0.05 * sq), body, kind === 'chicken' ? -0.25 : 0);
+    if (kind === 'cow') { flat(g, bx - 0.12 * r, 0.4 * r, 0.3 * r, 0.22 * r, '#3a3532', 0.3); flat(g, bx + 0.35 * r, 0.65 * r, 0.16 * r, 0.12 * r, '#3a3532', 0.2); }
+    else if (kind === 'chicken') ball(g, bx - 0.02 * r, 0.52 * r, 0.36 * r, 0.24 * r, '#efe7d6', 0.25 + 0.5 * amt * (0.5 + 0.5 * sq));
+    g.restore();
+    sideLeg(g, kind, r, bx - rx * 0.55, Math.PI, false, pose); sideLeg(g, kind, r, bx + rx * 0.55, 0, false, pose);   // near legs
+    if (kind === 'horse') { // arched neck, mane and a long face
+      poly(g, [bx + 0.35 * r, 0.3 * r, bx + 0.78 * r, 0.4 * r, bx + 0.98 * r, -0.4 * r, bx + 0.62 * r, -0.8 * r], '#a8683c');
+      poly(g, [bx + 0.3 * r, 0.25 * r, bx + 0.56 * r, -0.82 * r, bx + 0.7 * r, -0.76 * r, bx + 0.42 * r, 0.3 * r], '#4b2f20');
+    }
+    // the head nods with the stride (a chicken pecks forward)
+    var hx = { dog: 0.64, cat: 0.6, cow: 0.64, horse: 1.12, pig: 0.68, chicken: 0.5 }[kind] * r + bx, hy = { horse: -0.42, chicken: -0.14 }[kind] * r;
+    if (hy === undefined || isNaN(hy)) hy = -0.14 * r;
+    g.save(); g.translate(hx + (kind === 'chicken' ? 0.07 * r * cs : 0), hy + (kind === 'chicken' ? 0 : 0.05 * r * sq)); g.rotate(0.1 * sn);
+    function eye(ex, ey, s) {
+      flat(g, ex, ey, 0.1 * u * s, 0.12 * u * s, '#2b211c'); flat(g, ex - 0.03 * u, ey - 0.04 * u, 0.035 * u, 0.04 * u, '#ffffff');
+    }
+    if (kind === 'dog') {
+      ball(g, 0, 0, u * 1.05, u, body);
+      flat(g, 0.25 * u, -0.45 * u, 0.5 * u, 0.3 * u, '#9a6a3e');
+      ball(g, 0.78 * u, 0.32 * u, 0.58 * u, 0.4 * u, '#f6e6c8');
+      ball(g, 1.3 * u, 0.2 * u, 0.17 * u, 0.14 * u, '#3b2a22');
+      flat(g, 0.9 * u, 0.62 * u, 0.2 * u, 0.1 * u, '#e8708a');
+      eye(0.42 * u, -0.12 * u, 1);
+      ball(g, -0.35 * u, 0.1 * u, 0.34 * u, 0.62 * u, '#8a5a35', 0.2 + 0.3 * cs);
+    } else if (kind === 'cat') {
+      poly(g, [-0.55 * u, -0.5 * u, -0.5 * u, -1.45 * u, 0.15 * u, -0.85 * u], body);
+      poly(g, [-0.4 * u, -0.6 * u, -0.38 * u, -1.15 * u, 0.0 * u, -0.8 * u], '#f3b3b3');
+      poly(g, [0.0 * u, -0.85 * u, 0.5 * u, -1.45 * u, 0.78 * u, -0.45 * u], mix(body, -0.08));
+      ball(g, 0, 0, u * 1.05, u * 0.92, body);
+      g.strokeStyle = '#b86d2a'; g.lineWidth = 0.06 * u;
+      for (i = -1; i <= 1; i++) { g.beginPath(); g.moveTo(i * 0.22 * u, -0.9 * u); g.lineTo(i * 0.22 * u + 0.1 * u, -0.6 * u); g.stroke(); }
+      ball(g, 0.74 * u, 0.34 * u, 0.4 * u, 0.28 * u, '#fbe6cc');
+      poly(g, [0.98 * u, 0.2 * u, 1.18 * u, 0.26 * u, 1.04 * u, 0.4 * u], '#e57f93');
+      g.strokeStyle = 'rgba(60,40,30,0.55)'; g.lineWidth = 0.025 * u;
+      g.beginPath(); g.moveTo(0.9 * u, 0.4 * u); g.lineTo(1.65 * u, 0.28 * u); g.moveTo(0.9 * u, 0.46 * u); g.lineTo(1.6 * u, 0.58 * u); g.stroke();
+      eye(0.42 * u, -0.12 * u, 1);
+    } else if (kind === 'cow') {
+      ball(g, 0.05 * u, -1.0 * u, 0.14 * u, 0.22 * u, '#efe0b8', 0.2);
+      ball(g, -0.62 * u, -0.45 * u, 0.42 * u, 0.18 * u, '#fbf7ee', 0.45 + 0.3 * cs);
+      ball(g, 0, 0, u * 1.05, u * 0.98, '#fbf7ee');
+      flat(g, -0.3 * u, -0.38 * u, 0.4 * u, 0.34 * u, '#3a3532', 0.3);
+      ball(g, 0.82 * u, 0.4 * u, 0.62 * u, 0.46 * u, '#f3b3b3');
+      flat(g, 1.28 * u, 0.36 * u, 0.07 * u, 0.1 * u, '#b5686c');
+      eye(0.45 * u, -0.14 * u, 1);
+    } else if (kind === 'horse') {
+      ball(g, 0.1 * r, -0.12 * r, 0.27 * r, 0.52 * r, '#a8683c', -0.85);
+      ball(g, 0.4 * r, 0.12 * r, 0.2 * r, 0.26 * r, '#c99468', -0.85);
+      flat(g, 0.5 * r, 0.2 * r, 0.04 * r, 0.06 * r, '#5a3a28', -0.85);
+      poly(g, [-0.18 * r, -0.4 * r, -0.2 * r, -0.82 * r, 0.0 * r, -0.5 * r], '#a8683c');
+      ball(g, -0.04 * r, -0.4 * r, 0.12 * r, 0.2 * r, '#4b2f20', 0.3);
+      eye(0.12 * r, -0.2 * r, 0.9);
+    } else if (kind === 'pig') {
+      ball(g, 0, 0, u * 1.05, u * 0.94, body);
+      poly(g, [-0.55 * u, -0.6 * u, 0.1 * u, -1.0 * u, 0.15 * u, -0.25 * u], '#ee93a6');
+      flat(g, 0.45 * u, 0.25 * u, 0.17 * u, 0.1 * u, 'rgba(240,120,140,0.5)');
+      ball(g, 1.0 * u, 0.24 * u, 0.34 * u, 0.36 * u, '#f08ea5');
+      flat(g, 1.18 * u, 0.2 * u, 0.06 * u, 0.1 * u, '#a8465f'); flat(g, 1.02 * u, 0.42 * u, 0.06 * u, 0.08 * u, '#a8465f');
+      eye(0.45 * u, -0.14 * u, 0.9);
+    } else { // chicken
+      for (i = -1; i <= 1; i++) ball(g, i * 0.2 * r - 0.04 * r, -0.33 * r - (i === 0 ? 0.07 * r : 0), 0.11 * r, 0.12 * r, '#e2453c');
+      ball(g, 0, 0, 0.3 * r, 0.3 * r, body);
+      poly(g, [0.24 * r, -0.12 * r, 0.56 * r, 0.0 * r, 0.24 * r, 0.08 * r], '#f0a030');
+      ball(g, 0.2 * r, 0.16 * r, 0.07 * r, 0.12 * r, '#e2453c');
+      eye(0.1 * r, -0.07 * r, 0.9);
+    }
+    g.restore();
+  }
+
+  /* Seen from behind: no face, ears, tail and rump readable, hind legs nearest. */
+  function backAnimal(g, kind, r, pose) {
+    var amt = pose ? pose.amount : 0, sn = pose ? Math.sin(pose.phase) * amt : 0, cs = pose ? Math.cos(pose.phase) * amt : 0;
+    var sq = pose ? Math.cos(2 * pose.phase) * amt : 0, body = ANI_BODY[kind], H = 0.62 * r, hy = -0.14 * r, i;
+    function X(v) { return v * H; }
+    function Y(v) { return hy + v * H; }
+    groundShadow(g, r, 0.8);
+    drawLeg(g, kind, r, -1, true, Math.PI, pose, true); drawLeg(g, kind, r, 1, true, 0, pose, true);   // far (front) legs
+    g.save(); g.translate(0, 0.75 * r); g.rotate(0.07 * sn); g.translate(0, -0.75 * r);
+    ball(g, 0, 0.5 * r, (kind === 'chicken' ? 0.64 : 0.6) * r * (1 + 0.05 * sq), 0.46 * r * (1 - 0.06 * sq), body);
+    g.restore();
+    // tail on the rump
+    g.save(); g.lineCap = 'round'; g.translate(0, 0.4 * r); g.rotate(0.35 * sn);
+    if (kind === 'dog') { g.strokeStyle = '#b98550'; g.lineWidth = 0.14 * r; g.beginPath(); g.moveTo(0, 0.1 * r); g.quadraticCurveTo(0.08 * r, -0.15 * r, 0.02 * r, -0.3 * r); g.stroke(); }
+    else if (kind === 'cat') { g.strokeStyle = body; g.lineWidth = 0.13 * r; g.beginPath(); g.moveTo(0, 0.1 * r); g.quadraticCurveTo(0.22 * r, -0.2 * r, -0.04 * r, -0.5 * r); g.stroke(); }
+    else if (kind === 'cow') { g.strokeStyle = '#3a3532'; g.lineWidth = 0.08 * r; g.beginPath(); g.moveTo(0, -0.05 * r); g.lineTo(0, 0.4 * r); g.stroke(); ball(g, 0, 0.5 * r, 0.1 * r, 0.16 * r, '#3a3532'); }
+    else if (kind === 'horse') poly(g, [-0.08 * r, -0.05 * r, 0.08 * r, -0.05 * r, 0.16 * r, 0.5 * r, 0, 0.62 * r, -0.16 * r, 0.5 * r], '#4b2f20');
+    else if (kind === 'pig') { g.strokeStyle = '#ee93a6'; g.lineWidth = 0.07 * r; g.beginPath(); g.arc(0, 0, 0.1 * r, 0.3, TAU * 0.95); g.stroke(); }
+    else { for (i = -2; i <= 2; i++) ball(g, i * 0.17 * r, -0.2 * r - (2 - Math.abs(i)) * 0.06 * r, 0.1 * r, 0.34 * r, i % 2 ? '#e2453c' : '#efe7d6', i * 0.28); }
+    g.restore();
+    if (kind === 'cow') flat(g, 0.2 * r, 0.45 * r, 0.2 * r, 0.14 * r, '#3a3532', 0.4);
+    if (kind === 'chicken') for (i = -1; i <= 1; i += 2) ball(g, i * 0.45 * r, 0.5 * r, 0.18 * r, 0.3 * r, '#efe7d6', -i * (0.3 + 0.55 * amt * (0.5 + 0.5 * sq)));
+    drawLeg(g, kind, r, -1, false, 0, pose, true); drawLeg(g, kind, r, 1, false, Math.PI, pose, true);   // near (hind) legs
+    g.save(); g.translate(0, hy + (kind === 'chicken' ? 0.09 * r * cs : 0.06 * r * sq)); g.rotate(0.13 * sn); g.translate(0, -hy);
+    if (kind === 'dog') {
+      for (i = -1; i <= 1; i += 2) ball(g, X(i * 0.85), Y(-0.05), 0.3 * H, 0.55 * H, '#8a5a35', -i * 0.25 + i * 0.35 * cs);
+      ball(g, 0, hy, H, H * 0.96, body);
+      flat(g, X(0.4), Y(-0.2), 0.3 * H, 0.3 * H, '#9a6a3e');
+    } else if (kind === 'cat') {
+      for (i = -1; i <= 1; i += 2) poly(g, [X(i * 0.97), Y(-0.2), X(i * 0.72) + i * 0.08 * H * cs, Y(-1.15), X(i * 0.22), Y(-0.82)], mix(body, -0.06));
+      ball(g, 0, hy, H, H * 0.92, body);
+      g.strokeStyle = '#b86d2a'; g.lineWidth = 0.06 * H; g.lineCap = 'round';
+      for (i = -1; i <= 1; i++) { g.beginPath(); g.moveTo(X(i * 0.22), Y(-0.9)); g.lineTo(X(i * 0.22), Y(-0.45)); g.stroke(); }
+    } else if (kind === 'cow') {
+      for (i = -1; i <= 1; i += 2) {
+        ball(g, X(i * 0.55), Y(-0.98), 0.14 * H, 0.2 * H, '#efe0b8', i * 0.4);
+        ball(g, X(i * 1.0), Y(-0.45), 0.34 * H, 0.18 * H, '#fbf7ee', i * (0.3 + 0.4 * cs));
+      }
+      ball(g, 0, hy, H, H * 0.98, '#fbf7ee');
+      flat(g, X(-0.4), Y(-0.3), 0.4 * H, 0.36 * H, '#3a3532', 0.4);
+    } else if (kind === 'horse') {
+      for (i = -1; i <= 1; i += 2) poly(g, [X(i * 0.82), Y(-0.45), X(i * 0.62) + i * 0.1 * H * cs, Y(-1.28), X(i * 0.28), Y(-0.75)], '#a8683c');
+      ball(g, 0, hy + 0.02 * r, 0.86 * H, 1.04 * H, '#a8683c');
+      ball(g, 0, Y(0.1), 0.2 * H, 0.95 * H, '#4b2f20');   // mane down the back of the neck
+    } else if (kind === 'pig') {
+      for (i = -1; i <= 1; i += 2) poly(g, [X(i * 0.95), Y(-0.1), X(i * 0.4), Y(-0.9), X(i * 1.12), Y(-0.78) + 0.14 * H * cs * i], '#ee93a6');
+      ball(g, 0, hy, H, H * 0.94, body);
+    } else {
+      for (i = -1; i <= 1; i++) ball(g, X(i * 0.3), Y(-1.0 - (i === 0 ? 0.12 : 0) - 0.07 * Math.abs(cs)), 0.22 * H, 0.24 * H, '#e2453c');
+      ball(g, 0, hy, H, H * 0.96, body);
+      ball(g, 0, Y(0.45), 0.55 * H, 0.35 * H, mix(body, -0.06));   // nape feathers
+    }
+    g.restore();
+  }
+
   // pose (optional): { phase, amount } from the distance-driven gait; omitted = the neutral, static pose.
-  function drawAnimal(g, kind, cx, cy, r, pose) {
+  // dir (optional): 0 right, 2 left, 3 away from the viewer (back); 1 or omitted = the front-facing view.
+  function drawAnimal(g, kind, cx, cy, r, pose, dir) {
+    if (dir === 0 || dir === 2 || dir === 3) {
+      g.save(); g.translate(cx, cy);
+      if (dir === 3) backAnimal(g, kind, r, pose);
+      else { if (dir === 2) g.scale(-1, 1); sideAnimal(g, kind, r, pose); }
+      g.restore();
+      return;
+    }
     var amt = pose ? pose.amount : 0, sn = pose ? Math.sin(pose.phase) * amt : 0, cs = pose ? Math.cos(pose.phase) * amt : 0;
     var sq = pose ? Math.cos(2 * pose.phase) * amt : 0;
     g.save(); g.translate(cx, cy);
@@ -936,7 +1143,8 @@
     var ui = {
       mode: 'carve', view: 'fit', place: null, dpr: 0, cw: 0, ch: 0, t: 24, close: false, layer: null, layerDirty: true,
       ox: 0, oy: 0, vt: { x: 0, y: 0 }, vr: { x: 0, y: 0 }, particles: [], hint: null,
-      reduce: false, motionMode: 'device', deviceReduce: false, cornT: 0, sprites: null, cornDrawn: 0,
+      reduce: false, motionMode: 'device', deviceReduce: false, cornT: 0, sprites: null, cornDrawn: 0, cornStats: { drawn: 0, activeCells: 0, activePlants: 0, visiblePlants: 0 },
+      pendingTrack: null, trackAt: 0,
       ownsSave: false, resumeRaw: null, saveBlocked: false,
       startedAt: null, elapsed: 0, running: false, held: null, nextStep: 0, pointer: null, strokeTimer: 0,
       lastHud: '', saveTimer: 0, phase: 0, modal: null, lastFocus: null, confirmResolve: null, winShown: false,
@@ -1382,6 +1590,7 @@
     });
     function openImport() {
       $('import-text').value = ''; $('import-error').textContent = ''; $('import-file').value = '';
+      $('loaded-support').hidden = true;
       showModal('modal-import');
     }
     $('import-file').addEventListener('change', function () {
@@ -1397,7 +1606,7 @@
       var res = core.parse($('import-text').value);
       if (!res.ok) { $('import-error').textContent = res.error; return; }
       hideModal(true);
-      var apply = function () { cancelSave(); useState(res.state); S.dirty = false; scheduleSave(true); say('Loaded "' + S.name + '".'); };
+      var apply = function () { cancelSave(); useState(res.state); S.dirty = false; scheduleSave(true); $('loaded-support').hidden = false; say('Loaded "' + S.name + '".'); };
       if (S.dirty) ask('Replace your current field?', 'Importing "' + res.state.name + '" replaces the field you are working on. Export it first if you want to keep it. This cannot be undone.', 'Replace field').then(function (y) { if (y) apply(); });
       else apply();
     });
@@ -1422,7 +1631,7 @@
       }
       drawTractor(g, lx + ox + (S.tractor.x + 0.5) * t, ly + oy + (S.tractor.y + 0.5) * t, t, S.tractor.dir, 0);
       g.fillStyle = '#6d6b5f'; g.font = '18px system-ui, sans-serif';
-      g.fillText(maze ? 'Cornfield Carver · find the way to the flag' : 'Cornfield Carver · a field of corn art', W / 2, H - 26);
+      g.fillText(maze ? 'Hedge and Harvest · find the way to the flag' : 'Hedge and Harvest · a field of corn art', W / 2, H - 26);
       cv.toBlob(function (b) {
         if (b) { download(b, slug() + '.png'); say('Picture saved.'); } else say('Could not create the picture.');
       }, 'image/png');
@@ -1481,6 +1690,7 @@
       });
       var up = function () { if (ui.held === d) ui.held = null; };
       b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('lostpointercapture', up);
+      b.addEventListener('contextmenu', function (e) { e.preventDefault(); });   // a long press must not open a menu and cancel the hold
       b.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); act(d[0], d[1]); } });
     });
 
@@ -1603,22 +1813,46 @@
 
     /* ---- music: song picker, Auto rotate, now playing (see audio.js) ---- */
     var npText = '';
+    // The select and status follow the song actually heard (nowPlaying), not the saved/scheduled one. After a pick or skip
+    // ui.pendingTrack remembers the target until that song's audible onset, so quick repeated skips keep advancing.
+    function trackTitle(id) {
+      for (var i = 0; i < audio.tracks.length; i++) if (audio.tracks[i].id === id) return audio.tracks[i].title;
+      return '';
+    }
     function syncMusicUI() {
       if (!audio || !audio.tracks) return;
-      var np = audio.nowPlaying(), txt = np.playing ? 'Now playing: ' + np.title : (audio.music() ? 'Starting: ' + np.title : 'Music is off. Selected: ' + np.title);
-      if ($('music-track').value !== audio.track()) $('music-track').value = audio.track();
+      var np = audio.nowPlaying(), pend = ui.pendingTrack;
+      if (pend && (np.id === pend || !np.playing || performance.now() - ui.trackAt > 6000)) pend = ui.pendingTrack = null;
+      var shown = pend || np.id;
+      var txt = pend ? 'Switching to: ' + trackTitle(pend)
+        : np.playing ? 'Now playing: ' + np.title : (audio.music() ? 'Starting: ' + np.title : 'Music is off. Selected: ' + np.title);
+      if ($('music-track').value !== shown) $('music-track').value = shown;
       $('music-rotate').checked = audio.autoRotate();
       if (txt !== npText) { npText = txt; $('now-playing').textContent = txt; }
+    }
+    function pickTrack(id) {
+      ui.pendingTrack = id; ui.trackAt = performance.now();
+      audio.setTrack(id);   // never touches the music switch: choosing a song does not unmute
+      syncMusicUI();
+    }
+    function stepTrack(delta) {
+      var ids = audio.tracks.map(function (tr) { return tr.id; }), cur = ids.indexOf(ui.pendingTrack || audio.nowPlaying().id);
+      pickTrack(ids[((cur < 0 ? 0 : cur) + delta + ids.length) % ids.length]);
     }
     if (audio && audio.tracks) {
       audio.tracks.forEach(function (tr) {
         var o = document.createElement('option'); o.value = tr.id; o.textContent = tr.title; $('music-track').appendChild(o);
       });
-      $('music-track').addEventListener('change', function () { audio.setTrack(this.value); });
+      $('music-track').addEventListener('change', function () { pickTrack(this.value); });
+      $('music-prev').addEventListener('click', function () { stepTrack(-1); });
+      $('music-next').addEventListener('click', function () { stepTrack(1); });
       $('music-rotate').addEventListener('change', function () { audio.setAutoRotate(this.checked); });
       audio.onChange(syncMusicUI);
       syncMusicUI();
-    } else { $('music-track').disabled = true; $('music-rotate').disabled = true; $('now-playing').textContent = 'Music is not available.'; }
+    } else {
+      $('music-track').disabled = true; $('music-rotate').disabled = true; $('music-prev').disabled = true; $('music-next').disabled = true;
+      $('now-playing').textContent = 'Music is not available.';
+    }
 
     /* ---- Continue: reopen the last saved field, only when asked ---- */
     function doResume() {
@@ -1630,7 +1864,7 @@
         ui.ownsSave = false; ui.resumeRaw = raw;   // the next real edit checkpoints it again
         if (store(KEY, raw)) $('save-status').textContent = 'Reopened your saved field';
         else $('save-status').textContent = 'Reopened your saved field (this browser cannot save it again)';
-        updateResume(); say('Reopened "' + S.name + '".');
+        updateResume(); $('loaded-support').hidden = false; say('Reopened "' + S.name + '".');
       };
       if (S.dirty) ask('Replace your current field?', 'Continue reopens your last saved field and replaces the one you are working on. Export it first if you want to keep it. This cannot be undone.', 'Continue saved field').then(function (y) { if (y) apply(); });
       else apply();
@@ -1684,8 +1918,9 @@
       g.drawImage(L.canvas, ui.ox, ui.oy, L.w, L.h);
       if (sway) {
         if (dt) ui.cornT += dt;
-        ui.cornDrawn = drawCorn(g, S, ui.sprites, t, dpr, ui.ox, ui.oy, ui.cw, ui.ch, ui.cornT);
-      } else ui.cornDrawn = 0;
+        ui.cornStats = drawCorn(g, S, ui.sprites, t, dpr, ui.ox, ui.oy, ui.cw, ui.ch, ui.cornT);
+        ui.cornDrawn = ui.cornStats.drawn;
+      } else { ui.cornDrawn = 0; ui.cornStats = { drawn: 0, activeCells: 0, activePlants: 0, visiblePlants: 0 }; }
       var bx = ui.ox + ORG * t, by = ui.oy + ORGY * t;
       function cx(x) { return bx + (x + 0.5) * t; }
       function cy(y) { return by + (y + 0.5) * t; }
@@ -1713,7 +1948,7 @@
       var bob = pose ? -Math.abs(Math.sin(G.phase)) * 0.09 * t * G.amount : 0;
       var jig = ui.bump && !ui.reduce ? Math.sin(ui.bump * 60) * 0.06 * t : 0;
       var tractor = { f: function () { drawTractor(g, cx(ui.vt.x), cy(ui.vt.y), t, S.tractor.dir, (ui.vt.x + ui.vt.y) % 1); } };
-      var runner = { f: function () { drawAnimal(g, S.animal, cx(ui.vr.x) + jig, cy(ui.vr.y) - 0.14 * t + bob, t * 0.5, pose); } };
+      var runner = { f: function () { drawAnimal(g, S.animal, cx(ui.vr.x) + jig, cy(ui.vr.y) - 0.14 * t + bob, t * 0.5, pose, S.run.dir); } };
       var list = ready ? (runActive ? [tractor, runner] : [runner, tractor]) : [tractor];
       for (i = 0; i < list.length; i++) list[i].f();
       // particles
@@ -1760,17 +1995,21 @@
           purpose: S.purpose, mode: ui.mode, place: ui.place, reduceMotion: ui.reduce, tab: ui.tab,
           motionMode: ui.motionMode, deviceReduce: ui.deviceReduce };
       },
-      animation: function () { return { phase: ui.gait.phase, moving: ui.gait.moving, amount: ui.gait.amount }; },
-      // active: corn is swaying live; drawn: corn cells drawn in the last frame (visible cells only)
+      animation: function () { return { phase: ui.gait.phase, moving: ui.gait.moving, amount: ui.gait.amount, dir: S.run.dir }; },
+      // active: corn is live-composited; drawn: corn cells drawn in the last frame (visible cells only);
+      // activePlants / visiblePlants: stalks mid-burst vs stalks in the drawn cells; amplitude: max lean in radians
       cornMotion: function () {
-        return { active: !ui.reduce && !!ui.layer && !ui.layer.withCorn, drawn: ui.cornDrawn, amplitude: SWAY_AMP, time: ui.cornT };
+        var c = ui.cornStats;
+        return { active: !ui.reduce && !!ui.layer && !ui.layer.withCorn, drawn: ui.cornDrawn, activeCells: c.activeCells,
+          activePlants: c.activePlants, visiblePlants: c.visiblePlants, amplitude: BURST_MAX, time: ui.cornT };
       },
-      // PNG data URL of the real animal renderer in a fixed pose, on a transparent 160x160 canvas
-      posePreview: function (kind, phase, amount) {
+      // PNG data URL of the real animal renderer in a fixed pose and facing (0 right, 1 down, 2 left, 3 up; default
+      // front), on a transparent 160x160 canvas
+      posePreview: function (kind, phase, amount, dir) {
         if (core.ANIMALS.indexOf(kind) < 0) return null;
         var cv = document.createElement('canvas'), pg;
         cv.width = cv.height = 160; pg = cv.getContext('2d');
-        drawAnimal(pg, kind, 80, 66, 56, { phase: +phase || 0, amount: Math.max(0, Math.min(1, amount === undefined ? 1 : +amount || 0)) });
+        drawAnimal(pg, kind, 80, 66, 56, { phase: +phase || 0, amount: Math.max(0, Math.min(1, amount === undefined ? 1 : +amount || 0)) }, dir === undefined ? 1 : dir);
         return cv.toDataURL('image/png');
       },
       minimap: function () {

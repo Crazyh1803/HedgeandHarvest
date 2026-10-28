@@ -3,21 +3,29 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Cornfield Carver: drive the tractor through the corn to make corn art, or turn it into a maze and run your animal to the flag.">
-<title>Cornfield Carver</title>
+<meta name="description" content="Hedge and Harvest: drive the tractor through the corn to make corn art, or turn it into a maze and run your animal to the flag.">
+<meta name="theme-color" content="#5a7a58">
+<title>Hedge and Harvest</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body data-season="summer" data-mode="carve" data-purpose="art">
 <div class="app">
   <header class="topbar">
     <div class="brand">
-      <h1>Cornfield <em>Carver</em></h1>
+      <h1>Hedge <em>and Harvest</em></h1>
       <p class="tagline">Carve a path through the corn. Make art, or make a maze.</p>
     </div>
     <div class="top-actions">
       <button id="btn-music" class="btn ghost tog" type="button" aria-pressed="false">Music: Off</button>
       <button id="btn-sfx" class="btn ghost tog" type="button" aria-pressed="false">Sounds: Off</button>
       <button id="btn-help" class="btn ghost" type="button">How to play</button>
+    </div>
+    <div id="now-playing-bar" class="now-bar" role="group" aria-label="Music player">
+      <button id="music-prev" class="btn ghost now-skip" type="button" aria-label="Previous song">&#9664;&#9664;</button>
+      <select id="music-track" class="text now-select" aria-label="Song"></select>
+      <button id="music-next" class="btn ghost now-skip" type="button" aria-label="Next song">&#9654;&#9654;</button>
+      <span id="now-playing" class="now-status" role="status" aria-live="polite"></span>
     </div>
     <p id="audio-note" class="audio-note" role="status" hidden>Sound isn't available in this browser.</p>
   </header>
@@ -53,6 +61,7 @@
             <button id="win-new" class="btn" type="button">Grow a new maze</button>
             <button id="win-share" class="btn ghost" type="button">Share</button>
           </div>
+          <p class="support">Enjoying the game? You can <a class="support-link" data-placement="completed" href="https://buymeacoffee.com/AppsbyDan" target="_blank" rel="noopener noreferrer">buy Dan a coffee</a>.</p>
         </div>
 
         <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -123,7 +132,9 @@
           <button id="btn-png" class="btn wide" type="button">Save picture (PNG)</button>
         </div>
         <p class="note" id="save-status">Autosave on</p>
+        <p class="note support" id="loaded-support" hidden>Enjoying the game? You can <a class="support-link" data-placement="loaded" href="https://buymeacoffee.com/AppsbyDan" target="_blank" rel="noopener noreferrer">buy Dan a coffee</a>.</p>
       </section>
+      <p class="note support support-main">Enjoying the game? You can <a class="support-link" data-placement="main" href="https://buymeacoffee.com/AppsbyDan" target="_blank" rel="noopener noreferrer">buy Dan a coffee</a>.</p>
       </div>
 
       <div class="tabpanel" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
@@ -171,11 +182,11 @@
 
       <section class="card" aria-labelledby="music-title">
         <h2 id="music-title">Music</h2>
-        <label class="label" for="music-track">Song</label>
-        <select id="music-track" class="text"></select>
         <label class="check" for="music-rotate"><input id="music-rotate" type="checkbox" checked> Auto rotate songs (about every minute)</label>
-        <p class="note" id="now-playing" role="status" aria-live="polite"></p>
+        <p class="note">Pick songs and skip with the player at the top of the page.</p>
       </section>
+
+      <p class="note support support-settings">Enjoying the game? You can <a class="support-link" data-placement="settings" href="https://buymeacoffee.com/AppsbyDan" target="_blank" rel="noopener noreferrer">buy Dan a coffee</a>.</p>
       </div>
     </aside>
   </main>
@@ -184,7 +195,7 @@
 <div class="modal" id="modal-help" hidden>
   <div class="modal-backdrop" data-close></div>
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="help-title">
-    <h2 id="help-title">How to play</h2>
+    <h2 id="help-title">How to play Hedge and Harvest</h2>
     <ol class="help">
       <li><b>Carve.</b> The field starts fully planted. Drive the tractor with the arrow keys / WASD, the on-screen pad, or by dragging from the tractor to cut paths and make corn art.</li>
       <li><b>Maze (optional).</b> Turn on <b>Maze</b> to reveal <b>Place start</b> and <b>Place exit</b>. Choose a button, then tap or click any spot in the field. Nothing is generated for you unless you press <b>Grow new maze</b>, and your art is kept when you switch Maze on or off.</li>
@@ -215,6 +226,7 @@
     <p id="share-note" class="note"></p>
     <label class="label" for="share-text">Creation data (JSON)</label>
     <textarea id="share-text" class="text mono" rows="8" readonly spellcheck="false"></textarea>
+    <p class="note support">Enjoying the game? You can <a class="support-link" data-placement="shared" href="https://buymeacoffee.com/AppsbyDan" target="_blank" rel="noopener noreferrer">buy Dan a coffee</a>.</p>
     <div class="modal-actions">
       <button class="btn" type="button" data-close>Close</button>
       <button id="share-copy" class="btn" type="button">Copy</button>
