@@ -8,7 +8,7 @@ function harness() {
   const voices = [], intervals = new Map(), timeouts = [], listeners = {}, storage = new Map();
   let context, nextId = 1;
   const param = () => ({ value: 0, setValueAtTime(v) { this.value = v; }, linearRampToValueAtTime(v) { this.value = v; }, exponentialRampToValueAtTime(v) { this.value = v; }, setTargetAtTime(v) { this.value = v; }, cancelScheduledValues() {} });
-  const node = () => ({ connect() {}, disconnect() {} });
+  const node = () => ({ connect(target) { if (target.frequency) this.filterFrequency = target.frequency.value; return target; }, disconnect() { this.disconnected = true; } });
   class AudioContext {
     constructor() { context = this; this.currentTime = 0; this.sampleRate = 44100; this.state = 'running'; this.destination = node(); }
     createGain() { return { ...node(), gain: param() }; }
@@ -17,7 +17,7 @@ function harness() {
     createBufferSource() { return this.source(true); }
     createBuffer(channels, length) { return { getChannelData: () => new Float32Array(length) }; }
     source(noise) {
-      const voice = { ...node(), frequency: param(), playbackRate: param(), noise, type: 'sine', start(t) { this.startAt = t; voices.push(this); }, stop(t) { this.stopAt = t; } };
+      const voice = { ...node(), frequency: param(), playbackRate: param(), noise, type: 'sine', onended: null, ended: false, start(t) { this.startAt = t; voices.push(this); }, stop(t) { this.stopAt = t; } };
       return voice;
     }
     resume() { this.state = 'running'; return Promise.resolve(); }
@@ -31,22 +31,42 @@ function harness() {
     setTimeout(fn) { timeouts.push(fn); return timeouts.length; }, clearTimeout() {}
   });
   return { audio: window.CornfieldAudio, voices, document, listeners, intervals, timeouts,
-    advance(seconds) { context.currentTime += seconds; for (const fn of [...intervals.values()]) fn(); }, get ctx() { return context; } };
+    advance(seconds) {
+      context.currentTime += seconds;
+      for (const v of voices) if (!v.ended && v.stopAt <= context.currentTime) { v.ended = true; if (v.onended) v.onended(); }
+      for (const fn of [...intervals.values()]) fn();
+    }, get ctx() { return context; } };
 }
 
 test('music has a frequent rhythmic arrangement with short voices and bounded lookahead', () => {
   const h = harness();
   assert.equal(h.audio.music(), false); assert.equal(h.audio.sfx(), false);
   h.audio.setMusic(true);
-  for (let i = 0; i < 80; i++) h.advance(0.1);
+  for (let i = 0; i < 80; i++) {
+    h.advance(0.1);
+    assert.ok(h.voices.filter(v => !v.ended).length <= 32, 'live music sources must remain bounded after cleanup');
+  }
   assert.ok(h.voices.length >= 40, 'eight seconds should contain a regular beat, bass and melody, rather than sparse ambience');
   assert.ok(h.voices.every(v => Number.isFinite(v.stopAt) && v.stopAt >= v.startAt), 'all scheduled voices must have a finite end');
   assert.ok(h.voices.every(v => v.stopAt - v.startAt < 2.5), 'short articulation should replace long ambient pads');
-  const times = [...new Set(h.voices.map(v => Number(v.startAt.toFixed(3))))].sort((a, b) => a - b);
-  assert.ok(times.some((t, i) => i > 0 && t - times[i - 1] >= 0.2 && t - times[i - 1] <= 0.29), 'eighth-note pulse should be near 116–120 BPM');
+  const times = h.voices.filter(v => v.noise && v.filterFrequency >= 5000).map(v => v.startAt).sort((a, b) => a - b);
+  assert.ok(times.length >= 28, 'hats should provide a regular eighth-note pulse');
+  for (let i = 1; i < times.length; i++) assert.ok(Math.abs(times[i] - times[i - 1] - 60 / 118 / 2) < 0.01, 'every hat interval should follow the steady 118 BPM grid');
+  assert.ok(h.voices.filter(v => v.ended).every(v => v.disconnected), 'ended sources must disconnect');
   const before = h.voices.length;
   h.advance(30);
   assert.ok(h.voices.length - before < 25, 'resuming after a gap must not schedule a backlog burst');
+  assert.ok(h.voices.slice(before).every(v => v.startAt >= h.ctx.currentTime && v.startAt < h.ctx.currentTime + 0.2), 'scheduling must follow the advanced audio clock');
+});
+
+test('rapid music off/on does not double-schedule percussion within the lookahead', () => {
+  const h = harness(); h.audio.setMusic(true); h.advance(0.04);
+  const count = h.voices.length;
+  h.audio.setMusic(false); h.audio.setMusic(true);
+  assert.equal(h.voices.length, count, 'rapid toggle must retain the rhythmic grid without scheduling a second onset');
+  h.advance(0.3);
+  const hats = h.voices.filter(v => v.noise && v.filterFrequency >= 5000 && v.stopAt > v.startAt).map(v => v.startAt.toFixed(4));
+  assert.equal(new Set(hats).size, hats.length);
 });
 
 test('music and effects stay independent and hidden tabs stop the scheduler', () => {

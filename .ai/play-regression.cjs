@@ -60,14 +60,15 @@ require('node:fs').mkdirSync('.ai/previews', { recursive: true });
       await page.keyboard.press('ArrowUp');
       assert.equal(await page.evaluate(() => window.__cornfield.animation().moving), false, 'blocked input cannot start a gait');
       await page.keyboard.down('ArrowRight');
-      await page.waitForTimeout(90);
+      await page.waitForFunction(() => window.__cornfield.animation().moving);
       const first = await page.evaluate(() => window.__cornfield.animation());
-      await page.waitForTimeout(160);
+      await page.waitForFunction(phase => window.__cornfield.animation().phase !== phase, first.phase);
       const second = await page.evaluate(() => window.__cornfield.animation());
       assert.ok(first.moving || second.moving, `${animal} should animate during movement`);
       assert.notEqual(first.phase, second.phase, `${animal} stride should advance with distance`);
       await page.locator('#field').screenshot({ path: `.ai/previews/run-${animal}.png` });
-      await page.keyboard.up('ArrowRight'); await page.waitForTimeout(1100);
+      await page.keyboard.up('ArrowRight');
+      await page.waitForFunction(() => !window.__cornfield.animation().moving && window.__cornfield.animation().amount === 0);
       const stopped = await page.evaluate(() => window.__cornfield.animation());
       assert.equal(stopped.moving, false); assert.equal(stopped.amount, 0, `${animal} should settle to a static pose`);
     }
