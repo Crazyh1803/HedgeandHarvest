@@ -10,6 +10,7 @@ require('node:fs').mkdirSync('.ai/previews', { recursive: true });
   const browser = await chromium.launch({ headless: true, channel: process.env.BROWSER_CHANNEL || 'msedge' });
   try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
     await page.addInitScript(() => {

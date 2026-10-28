@@ -102,6 +102,9 @@ require('node:fs').mkdirSync('.ai/previews', { recursive: true });
     await page.locator('#win-again').click();
     await page.screenshot({ path: '.ai/previews/desktop.png', fullPage: true });
     await page.reload();
+    assert.equal(await page.evaluate(() => window.__cornfield.state().purpose), 'art');
+    assert.ok(await page.evaluate(() => window.__cornfield.core.counts(window.__cornfield.state()).cleared <= 1), 'reload should open a fully planted art field');
+    await page.locator('#btn-resume').click();
     assert.equal(await page.locator('#creation-name').inputValue(), 'Autumn ramble');
     for (const width of [390, 768]) {
       await page.setViewportSize({ width, height: 844 });

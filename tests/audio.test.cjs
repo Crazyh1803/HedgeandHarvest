@@ -135,7 +135,7 @@ test('rotation advances on the audio timeline and manual changes clean queued vo
   }
   assert.equal(A.nowPlaying(), ids[1], 'second song should be audible after the 32-bar boundary');
   const old = h.voices.filter(v => !v.ended && v.startAt > h.ctx.currentTime);
-  A.setTrack(ids[4]); h.advance(0.25);
+  A.setTrack(ids[4]); for (let i = 0; i < 6; i++) h.advance(0.05);
   assert.equal(A.nowPlaying(), ids[4]);
   assert.ok(old.every(v => v.stopAt <= v.startAt || v.ended), 'queued old-track voices must be canceled when selecting a different song');
   assert.equal(A.sfx(), false);

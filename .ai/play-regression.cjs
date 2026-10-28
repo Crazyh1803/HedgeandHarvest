@@ -102,6 +102,7 @@ require('node:fs').mkdirSync('.ai/previews', { recursive: true });
     await page.screenshot({ path: '.ai/previews/settings-mobile.png', fullPage: true });
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.reload();
+    await page.locator('#btn-resume').click();
     await page.locator('#tab-play').click(); await page.locator('#mode-run').click();
     await page.locator('#field').focus(); await page.keyboard.down('ArrowRight'); await page.waitForTimeout(250); await page.keyboard.up('ArrowRight');
     assert.equal(await page.evaluate(() => window.__cornfield.animation().amount), 0, 'reduced motion must keep the gait neutral');

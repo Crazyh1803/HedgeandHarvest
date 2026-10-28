@@ -29,7 +29,19 @@ const C = require('../game.js');
       }, { raw, failBackup });
       await page.goto(url);
       await page.waitForFunction(() => !!window.__cornfield);
+      assert.equal(await page.evaluate(() => window.__cornfield.state().purpose), 'art');
+      assert.ok(await page.evaluate(() => window.__cornfield.core.counts(window.__cornfield.state()).cleared <= 1), 'all loads must start with a planted field');
+      await page.waitForTimeout(450);
+      assert.equal(await page.evaluate(() => localStorage.getItem('cornfield-carver:v1')), raw, 'startup must not replace the existing saved field');
       if (valid) {
+        await page.locator('#tab-settings').click();
+        await page.locator('button[data-season="spring"]').click();
+        await page.locator('[data-animal="pig"]').click();
+        await page.locator('#tab-play').click();
+        await page.locator('#creation-name').fill('Fresh unsaved field');
+        await page.waitForTimeout(450);
+        assert.equal(await page.evaluate(() => localStorage.getItem('cornfield-carver:v1')), raw, 'preferences and naming a fresh field must not replace the saved carving');
+        await page.locator('#btn-resume').click();
         const restored = await page.evaluate(() => window.__cornfield.core.serialize(window.__cornfield.state()));
         assert.equal(restored.purpose, 'maze');
         assert.equal(restored.version, 2);
@@ -42,6 +54,7 @@ const C = require('../game.js');
         await page.waitForTimeout(600);
         if (failBackup) {
           await page.locator('#creation-name').fill('New work during storage pressure');
+          await page.locator('#field').focus(); await page.keyboard.press('ArrowRight');
           await page.waitForTimeout(600);
           assert.equal(await page.evaluate(() => localStorage.getItem('cornfield-carver:v1')), raw, 'failed backup must block later autosaves from overwriting the original');
           assert.match(await page.locator('#save-status').innerText(), /Autosave paused/);
