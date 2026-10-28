@@ -1,0 +1,3 @@
+# Three larger fields
+
+Add exactly three presets after Great field, each tripling its predecessor's tile count: 69x35 (2415), 105x69 (7245), 207x105 (21735). All dimensions stay odd for maze generation. Claude implements presets/UI and necessary bounded rendering for fit/close-up; Codex independently tests area progression, generation/solvability, export round trips, and browser sizing/rendering on desktop/mobile. Existing saves retain compatibility. Use near-square readable field shapes rather than tripling both axes (which would multiply area by nine). Review via ak-review and tests via ak-test.
