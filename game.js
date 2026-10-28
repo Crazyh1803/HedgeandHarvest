@@ -437,6 +437,7 @@
     if (!(local < dur)) { out.angle = 0; out.active = false; return out; }
     var u = local / dur, env = Math.sin(Math.PI * u); env *= env;
     var hk = hash3(k, plant + 11, h), sign = hk & 1 ? 1 : -1;
+    // sin²(πu) * sin(2πu) peaks at 3√3/8 ≈ 0.6495; normalize so the requested lean is reached.
     var a = sign * peak * env * Math.sin(2 * Math.PI * u) / 0.65;
     out.angle = Math.max(-BURST_MAX, Math.min(BURST_MAX, a)); out.active = true; return out;
   }
@@ -1592,7 +1593,8 @@
     });
     function showLoadedSupport(shown) {
       $('loaded-support').hidden = !shown;
-      document.querySelector('.support-main').hidden = shown;
+      var mainSupport = document.querySelector('.support-main');
+      if (mainSupport) mainSupport.hidden = shown;
     }
     function openImport() {
       $('import-text').value = ''; $('import-error').textContent = ''; $('import-file').value = '';

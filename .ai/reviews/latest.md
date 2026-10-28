@@ -1,3 +1,5 @@
 VERDICT: APPROVE
 FINDINGS:
-- [MED] game.js:1326 — Continue visibility is not refreshed after releasing save ownership. If this session created the first saved carving, the card remains hidden because it previously checked the empty checkpoint, even though `ui.resumeRaw` now contains the carving. — Call `updateResume()` after replacing the field; add a regression starting with empty storage.
+- [LOW] game.js:1594 — `showLoadedSupport` queries `.support-main` on every call and throws if the element is missing, because it never checks for null. It is called from `useState`, which runs for every new game, so a markup change would break all state loads. — Cache the element once or guard against null.
+- [LOW] tests/personality.test.cjs:44 — The new test calls `cornPose` without an `out` argument, so it never exercises the pose-object reuse path now used in the renderer. A bug there, such as stale `angle` or `active` values across calls, would go unnoticed. — Add a case that passes a shared `out` object and checks that its results match fresh calls.
+- [LOW] game.js:439 — The magic constant `0.65` normalizes the peak of `env*sin(2πu)`. Nothing in the code or a comment ties it to that maximum, which is about 0.649. — Name the constant or add a one-line comment so it doesn't drift.

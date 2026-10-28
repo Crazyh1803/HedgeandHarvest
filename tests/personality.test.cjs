@@ -53,6 +53,16 @@ test('each complete sway burst is short and reaches a visible gentle lean', () =
   assert.ok(complete >= 6, 'sample several complete independent bursts');
 });
 
+test('reusing a render pose object matches fresh sampling through motion and rest', () => {
+  const shared = { angle: 999, active: true };
+  for (let plant = 0; plant < 3; plant++) for (let i = 0; i < 240; i++) {
+    const fresh = C.cornPose(3, 4, plant, 17, i / 4);
+    const reused = C.cornPose(3, 4, plant, 17, i / 4, shared);
+    assert.equal(reused, shared);
+    assert.deepEqual(reused, fresh, 'reused poses must clear stale active flags and angles while resting');
+  }
+});
+
 test('runner facing follows actual screen-relative movement and stays put against walls', () => {
   const s = C.newMaze({ size: 'small', season: 'summer', animal: 'dog', seed: 42, name: 'Directions' });
   s.grid.fill(0); s.start = { x: 4, y: 4 }; s.exit = { x: 13, y: 9 }; C.resetRun(s);
