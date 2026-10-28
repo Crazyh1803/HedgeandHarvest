@@ -268,3 +268,37 @@ body[data-season="winter"] { --sage-deep: #4e7a96; }
 @media (prefers-reduced-motion: reduce) {
   .toast, .btn { transition: none; }
 }
+
+/* field toolbar (top border of the stage) */
+.stage-col { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.stage-col > .support { margin: 0; text-align: center; }
+.card > .note:first-child { margin-top: 0; }
+.field-toolbar { position: relative; z-index: 6; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.field-toolbar .hud { padding-right: 0; margin: 0; }
+.field-toolbar .btn { min-height: 48px; }
+.field-toolbar .mode-switch { position: static; }
+.field-toolbar .mode-switch button { min-height: 48px; }
+.field-toolbar .menu { display: block; }
+#share-menu { margin-left: auto; }
+.menu > summary { list-style: none; display: flex; align-items: center; cursor: pointer; user-select: none; -webkit-user-select: none; }
+.menu > summary::-webkit-details-marker { display: none; }
+.menu > summary::after { content: "\25BE"; margin-left: 8px; font-size: 0.8em; }
+.menu[open] > summary { background: #e3efdd; box-shadow: inset 0 0 0 2px var(--sage-deep); }
+.menu > summary:focus-visible { outline: 3px solid #3f7fb0; outline-offset: 2px; }
+.menu-panel {
+  position: absolute; top: calc(100% + 6px); z-index: 20; width: min(300px, 100%);
+  display: flex; flex-direction: column; gap: 6px; padding: 8px;
+  background: var(--paper); border: 1.5px solid var(--line); border-radius: 18px; box-shadow: var(--shadow);
+}
+.menu-left { left: 0; }
+.menu-right { right: 0; }
+.menu-panel .btn { width: 100%; min-height: 48px; text-align: center; }
+.field-toolbar .gate-status { flex: 1 1 100%; margin: 0; min-height: 0; font-size: 0.85rem; }
+body[data-purpose="maze"] .hud { display: none; }
+.top-actions a.btn { display: inline-flex; align-items: center; text-decoration: none; }
+@media (max-width: 620px) {
+  .field-toolbar { gap: 6px; }
+  .field-toolbar .btn { padding-left: 12px; padding-right: 12px; }
+  .top-actions .btn { min-height: 48px; }
+  .canvas-wrap { height: min(40svh, calc(100svh - 470px)); min-height: 180px; }
+}

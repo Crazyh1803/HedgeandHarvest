@@ -1356,7 +1356,7 @@
       var maze = S.purpose === 'maze', ready = core.isConfigured(S);
       document.body.setAttribute('data-purpose', S.purpose);
       $('btn-maze').setAttribute('aria-pressed', maze ? 'true' : 'false');
-      $('btn-maze').textContent = 'Maze: ' + (maze ? 'On' : 'Off');
+      $('btn-maze').textContent = maze ? 'Back to art' : 'Make it a maze';
       $('mode-run').disabled = !ready;
       $('btn-place-start').setAttribute('aria-pressed', ui.place === 'start' ? 'true' : 'false');
       $('btn-place-exit').setAttribute('aria-pressed', ui.place === 'exit' ? 'true' : 'false');
@@ -1573,6 +1573,38 @@
       a.href = url; a.download = name; document.body.appendChild(a); a.click();
       setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1000);
     }
+    /* ---- toolbar menus (native details) ---- */
+    var menus = document.querySelectorAll('#field-toolbar .menu');
+    function openMenu() {
+      for (var i = 0; i < menus.length; i++) if (menus[i].open) return menus[i];
+      return null;
+    }
+    function closeMenus(focusSummary) {
+      for (var i = 0; i < menus.length; i++) {
+        if (!menus[i].open) continue;
+        menus[i].open = false;
+        if (focusSummary) menus[i].querySelector('summary').focus();
+      }
+    }
+    Array.prototype.forEach.call(menus, function (m) {
+      m.addEventListener('toggle', function () {
+        if (!m.open) return;
+        ui.held = null;
+        Array.prototype.forEach.call(menus, function (o) { if (o !== m) o.open = false; });
+      });
+      m.addEventListener('focusout', function (e) {
+        if (m.open && e.relatedTarget && !m.contains(e.relatedTarget)) m.open = false;
+      });
+      // capture phase: close and refocus the visible summary before the button's own handler opens a modal
+      m.querySelector('.menu-panel').addEventListener('click', function (e) {
+        if (e.target.closest('button')) { m.open = false; m.querySelector('summary').focus(); }
+      }, true);
+      m.querySelector('summary').addEventListener('pointerdown', function () { ui.held = null; });
+    });
+    document.addEventListener('click', function (e) {
+      var m = openMenu();
+      if (m && !m.contains(e.target)) m.open = false;
+    });
     function openShare() {
       var txt = JSON.stringify(core.serialize(S), null, 1);
       $('share-text').value = txt;
@@ -1654,6 +1686,7 @@
     }
     window.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
+        if (!ui.modal && openMenu()) { closeMenus(true); e.preventDefault(); return; }
         if (ui.modal) { hideModal(); e.preventDefault(); }
         else if (ui.place) { ui.place = null; updatePanel(); e.preventDefault(); }
         return;
@@ -1665,6 +1698,7 @@
         return;
       }
       if (ui.modal || isTyping(e) || e.altKey) return;
+      if (e.target.closest && e.target.closest('.menu')) return; // menu keys never drive an actor
       if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) { doUndo(); e.preventDefault(); return; }
       if (e.ctrlKey || e.metaKey) return;
       if (e.target.closest && e.target.closest('[role="tablist"]')) return; // tab keys never drive an actor
