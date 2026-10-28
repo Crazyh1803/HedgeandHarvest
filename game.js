@@ -1312,7 +1312,17 @@
     function newField(size) {
       var maze = S.purpose === 'maze';
       var o = { size: size, season: S.season, animal: S.animal, seed: randSeed(), name: S.name };
-      cancelSave();   // a new field is not written until it is carved; the saved one stays for Continue
+      /* Settle any pending carving first so Continue reopens it, then release ownership: the fresh field
+         is not written until it is carved, and its name/season/animal edits must not overwrite KEY. */
+      if (ui.ownsSave) {
+        if (ui.saveTimer) {
+          cancelSave();
+          if (!store(KEY, core.stringify(S, { tractor: true }))) { ui.saveBlocked = true; $('save-status').textContent = 'Autosave paused for this session to preserve your earlier save. Export this field to keep it.'; }
+        }
+        var latest = load(KEY);
+        if (latest && core.parse(latest).ok) ui.resumeRaw = latest;
+        ui.ownsSave = false;
+      } else cancelSave();
       useState(maze ? core.newMaze(o) : core.newBlank(o)); savePrefs();
       say(core.SIZES[size].label + (maze ? ': a new maze is ready.' : ': a fresh planted field.'));
     }

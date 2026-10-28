@@ -332,10 +332,16 @@
       on = !!on;
       if (on === prefs.auto) return on;
       var live = !!(ctx && prefs.music && timer), cur = trackIndexAt(beat);
+      if (live && !on) {   // beat runs ahead of the speakers: keep the song that is audible, not one queued after it
+        var n = ctx.currentTime, k = -1;
+        for (var j = 0; j < onsets.length; j++) if (onsets[j].t <= n) k = j;
+        if (k >= 0) cur = onsets[k].i;
+        hushMusic();   // cancel queued notes (and any queued song change); they restart as the held song
+        prefs.track = TRACK_IDS[cur]; baseTrack = holdTrack = cur; baseBeat = rotBeat = beat;
+      }
       prefs.auto = on; saveTrackPrefs();
       if (!live) { baseTrack = holdTrack = TRACK_IDS.indexOf(prefs.track); baseBeat = rotBeat = beat; }
       else if (on) { baseTrack = holdTrack = cur; rotBeat = baseBeat + Math.ceil((beat - baseBeat) / LOOP_STEPS) * LOOP_STEPS; }
-      else holdTrack = cur;   // the song now playing stays
       notify(); return on;
     },
     music: function () { return prefs.music; },
